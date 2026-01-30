@@ -1,0 +1,42 @@
+[Unit]
+Description=Gartenroboter3000 Garden Automation System
+Documentation=https://github.com/anneoneone/gartenroboter3000
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/gartenroboter3000
+
+# Environment
+Environment="PATH=/home/pi/.local/bin:/usr/local/bin:/usr/bin:/bin"
+EnvironmentFile=-/home/pi/gartenroboter3000/.env
+
+# Start command
+ExecStart=/home/pi/.local/bin/uv run gartenroboter
+
+# Restart policy
+Restart=on-failure
+RestartSec=10
+StartLimitInterval=60
+StartLimitBurst=3
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=gartenroboter
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/pi/gartenroboter3000/data /home/pi/gartenroboter3000/logs
+PrivateTmp=true
+
+# GPIO access
+SupplementaryGroups=gpio spi i2c
+
+[Install]
+WantedBy=multi-user.target

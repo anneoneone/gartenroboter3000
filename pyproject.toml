@@ -1,0 +1,116 @@
+[project]
+name = "gartenroboter"
+version = "0.1.0"
+description = "Raspberry Pi garden automation system with soil moisture monitoring, pump control, and Telegram integration"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Anton" }]
+keywords = ["raspberry-pi", "garden", "automation", "iot", "telegram"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Home Automation",
+]
+
+dependencies = [
+    "aiohttp>=3.9,<4.0",
+    "aiosqlite>=0.19,<1.0",
+    "pydantic>=2.0,<3.0",
+    "pydantic-settings>=2.0,<3.0",
+    "python-telegram-bot>=21.0,<22.0",
+    "astral>=3.2,<4.0",
+]
+
+[project.optional-dependencies]
+pi = ["gpiozero>=2.0,<3.0", "spidev>=3.6,<4.0", "RPi.GPIO>=0.7,<1.0"]
+dev = [
+    "pytest>=8.0,<9.0",
+    "pytest-asyncio>=0.23,<1.0",
+    "pytest-cov>=4.0,<6.0",
+    "ruff>=0.4,<1.0",
+    "pre-commit>=3.7,<4.0",
+    "mypy>=1.10,<2.0",
+]
+
+[project.scripts]
+gartenroboter = "gartenroboter.__main__:main"
+
+[project.urls]
+Repository = "https://github.com/anneoneone/gartenroboter3000"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/gartenroboter"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",     # pycodestyle errors
+    "F",     # pyflakes
+    "I",     # isort
+    "UP",    # pyupgrade
+    "B",     # flake8-bugbear
+    "SIM",   # flake8-simplify
+    "ASYNC", # flake8-async
+    "PTH",   # flake8-use-pathlib
+    "RUF",   # ruff-specific
+]
+ignore = [
+    "RUF001", # ambiguous unicode characters (allow emojis)
+]
+
+[tool.ruff.lint.pycodestyle]
+max-line-length = 88 # Enforce line length in linter
+
+[tool.ruff.lint.isort]
+known-first-party = ["gartenroboter"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+addopts = "-ra -q --strict-markers"
+markers = [
+    "integration: marks tests as integration tests",
+    "hardware: marks tests that require actual hardware",
+]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_ignores = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["gpiozero.*", "spidev.*", "RPi.*"]
+ignore_missing_imports = true
+
+[tool.coverage.run]
+source = ["src/gartenroboter"]
+branch = true
+omit = ["*/tests/*", "*/__main__.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+]
