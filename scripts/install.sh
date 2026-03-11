@@ -65,7 +65,7 @@ sudo apt install -y \
     python3-pip \
     python3-venv \
     git \
-    libgpiod2 \
+    gpiod \
     i2c-tools \
     python3-smbus \
     python3-rpi.gpio \
