@@ -103,6 +103,65 @@ MCP3008 ADC Channels:
   CH3 ◄── Soil Sensor Zone 4
   CH4 ◄── Water Level (analog, optional)
 
+### Soil Humidity Sensor Wiring (Capacitive 4-Channel)
+
+**Soil Sensor Pin Connections:**
+
+Each of the 4 soil sensors has 4 pins:
+```
+Soil Sensor Pinout:
+  1. GND  ← Connect to Raspberry Pi ground (any GND pin)
+  2. VCC  ← Connect to 3.3V power from Raspberry Pi (pin 1 or 17)
+  3. NC   ← Leave disconnected (stands for "No Connection")
+  4. SIG  ← Connect to MCP3008 analog input channel
+```
+
+
+```
+1. GND (Pin 1 - Brown wire)
+   └─ Connect to: Raspberry Pi GND (e.g., pin 6, 9, 14, 20, 25, 30, 34, or 39)
+
+2. VCC (Pin 2 - Red wire)  
+   └─ Connect to: Raspberry Pi 3.3V power (pin 1 - upper left, labeled "3V3")
+
+3. NC (Pin 3 - Yellow/White wire)
+   └─ Leave unconnected (NC = "No Connection", it's not used)
+
+4. SIG (Pin 4 - Black wire)
+   └─ Connect to ONE MCP3008 channel:
+      • Zone 1 Sensor SIG → MCP3008 CH0
+      • Zone 2 Sensor SIG → MCP3008 CH1
+      • Zone 3 Sensor SIG → MCP3008 CH2
+      • Zone 4 Sensor SIG → MCP3008 CH3
+```
+
+**MCP3008 Power Supply:**
+
+```
+MCP3008 VDD (pin 16) ──► Raspberry Pi 3.3V (pin 1)
+MCP3008 VSS (pin 15 or any other GND pin) ──► Raspberry Pi GND
+```
+
+**Pin Reference Chart:**
+
+| Soil Sensor | Purpose | Pin Type | Raspberry Pi Connection | Cable Color |
+|------------|---------|----------|------------------------|-------------|
+| GND | Ground return | Digital | GND (pins 6, 9, 14, 20, 25, 30, 34, 39) | Brown |
+| VCC | 3.3V power | Power | 3.3V (pins 1, 17) | Red |
+| NC | Not connected | — | Leave empty | (no cable) |
+| SIG | Analog signal | Analog | MCP3008 CH0-CH3 | Black |
+
+**MCP3008 SPI Communication (automatically configured):**
+
+| MCP3008 Pin | Raspberry Pi GPIO | Purpose |
+|-------------|-------------------|---------|
+| CS (CE0) | GPIO 8 (pin 24) | Chip Select |
+| DIN | GPIO 10 (pin 19) | Serial Data In (MOSI) |
+| DOUT | GPIO 9 (pin 21) | Serial Data Out (MISO) |
+| CLK | GPIO 11 (pin 23) | Serial Clock |
+| VDD | 3.3V (pin 1) | Positive Supply |
+| VSS | GND (pins 6, 9, 14, etc.) | Ground |
+
 Voltage Divider for HC-SR04 Echo (5V → 3.3V):
   Echo ──┬── 1kΩ ──► GPIO24
          └── 2kΩ ──► GND
@@ -188,10 +247,10 @@ GPIO 17 ────────────────────────
              │  ┌─────────────────►│─ VCC (5V) ◄──── GND (return)
              │  │                  │                   │
              │  │  ┌─ 1-3 (NO) ────┼──────────────────┤
-        GND ┴──┴─ 1-2 (COM)────────┼─┐                └─ GND (relay board)
-                                     │                
-                                     └──► Pump 1 Power Circuit
-                                         (+12V to pump, -12V return)
+         GND ┴──┴─ 1-2 (COM)────────┼─┐                └─ GND (relay board)
+                                      │                
+                                      └──► Pump 1 Power Circuit
+                                          (+12V to pump, -12V return)
 
 Pump 2 Circuit:
 ─────────────
@@ -394,6 +453,7 @@ ssh pi@gartenroboter.local
 # Default password: raspberry
 # CHANGE IT: passwd
 ```
+M@rT1n_B3LaU!
 
 **3. Run Automated Installation**
 ```bash
@@ -454,7 +514,7 @@ uv run gartenroboter --mock --debug
 # 3. Follow prompts to name your bot
 # 4. Copy the token (looks like: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz)
 # 5. Add to .env:
-TELEGRAM_BOT_TOKEN=123456789:ABCdefGHIjklMNOpqrsTUVwxyz
+TELEGRAM_BOT_TOKEN=8699595089:AAF5P8Fb1fTC75fzRDcTcjXmJeHqnt_b27M
 ```
 
 ### 2. Your Telegram Chat ID
