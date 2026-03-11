@@ -35,6 +35,7 @@ class Container:
     database: Database
     sensors: SensorManager
     pump: PumpController
+    pump_2: PumpController | None  # Optional second pump
     watering: WateringEngine
     weather: WeatherService
     sun: SunTracker
@@ -100,7 +101,22 @@ async def create_app(
         gpio=gpio,
         settings=settings.pump,
         gpio_settings=settings.gpio,
+        pump_id=1,
     )
+    
+    # Create second pump controller if configured
+    pump_2: PumpController | None = None
+    if settings.gpio.pump_relay_pin_2 > 0 and settings.gpio.pump_relay_pin_2 != settings.gpio.pump_relay_pin:
+        try:
+            pump_2 = PumpController(
+                gpio=gpio,
+                settings=settings.pump,
+                gpio_settings=settings.gpio,
+                pump_id=2,
+            )
+            logger.info("Dual pump mode enabled")
+        except ValueError as e:
+            logger.warning("Could not initialize second pump: %s", e)
 
     # Create weather service
     weather = WeatherService(
@@ -119,6 +135,7 @@ async def create_app(
         settings=settings,
         sensor_manager=sensors,
         pump_controller=pump,
+        pump_controller_2=pump_2,
         sun_tracker=sun,
         weather_service=weather,
     )
@@ -233,6 +250,7 @@ async def create_app(
         database=database,
         sensors=sensors,
         pump=pump,
+        pump_2=pump_2,
         watering=watering,
         weather=weather,
         sun=sun,

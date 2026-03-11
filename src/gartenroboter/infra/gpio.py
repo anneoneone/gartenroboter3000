@@ -40,12 +40,12 @@ class GpioInterface(ABC):
         ...
 
     @abstractmethod
-    async def set_relay(self, state: bool) -> None:
+    async def set_relay(self, pin: int, state: bool) -> None:
         """Set relay state (True = on, False = off)."""
         ...
 
     @abstractmethod
-    def get_relay_state(self) -> bool:
+    def get_relay_state(self, pin: int) -> bool:
         """Get current relay state."""
         ...
 
@@ -60,9 +60,9 @@ class RealGpio(GpioInterface):
 
     def __init__(self, settings: GpioSettings) -> None:
         self.settings = settings
-        self._relay_state = False
+        self._relay_states: dict[int, bool] = {}
+        self._relays: dict[int, object] = {}
         self._spi: object | None = None
-        self._relay: object | None = None
         self._trigger: object | None = None
         self._echo: object | None = None
 
@@ -79,12 +79,24 @@ class RealGpio(GpioInterface):
             self._spi.open(0, 0)  # Bus 0, Device 0 (CE0)
             self._spi.max_speed_hz = 1350000
 
-            # Initialize relay
-            self._relay = DigitalOutputDevice(
+            # Initialize pump relays (primary and optional secondary)
+            self._relays[self.settings.pump_relay_pin] = DigitalOutputDevice(
                 self.settings.pump_relay_pin,
                 active_high=True,
                 initial_value=False,
             )
+            self._relay_states[self.settings.pump_relay_pin] = False
+            
+            # Initialize second pump relay if configured
+            if self.settings.pump_relay_pin_2 > 0 and self.settings.pump_relay_pin_2 != self.settings.pump_relay_pin:
+                self._relays[self.settings.pump_relay_pin_2] = DigitalOutputDevice(
+                    self.settings.pump_relay_pin_2,
+                    active_high=True,
+                    initial_value=False,
+                )
+                self._relay_states[self.settings.pump_relay_pin_2] = False
+                logger.info("Dual pump mode enabled (pins %d and %d)", 
+                           self.settings.pump_relay_pin, self.settings.pump_relay_pin_2)
 
             # Initialize ultrasonic sensor
             self._trigger = DigitalOutputDevice(
@@ -156,22 +168,23 @@ class RealGpio(GpioInterface):
 
         return round(distance, 1)
 
-    async def set_relay(self, state: bool) -> None:
+    async def set_relay(self, pin: int, state: bool) -> None:
         """Set pump relay state."""
-        if self._relay is None:
-            raise RuntimeError("Relay not initialized")
+        if pin not in self._relays:
+            raise RuntimeError(f"Relay on pin {pin} not initialized")
 
+        relay = self._relays[pin]
         if state:
-            self._relay.on()
+            relay.on()
         else:
-            self._relay.off()
+            relay.off()
 
-        self._relay_state = state
-        logger.debug("Relay set to %s", "ON" if state else "OFF")
+        self._relay_states[pin] = state
+        logger.debug("Relay pin %d set to %s", pin, "ON" if state else "OFF")
 
-    def get_relay_state(self) -> bool:
+    def get_relay_state(self, pin: int) -> bool:
         """Get current relay state."""
-        return self._relay_state
+        return self._relay_states.get(pin, False)
 
     async def cleanup(self) -> None:
         """Cleanup GPIO resources."""
@@ -193,7 +206,7 @@ class MockGpio(GpioInterface):
 
     def __init__(self, settings: GpioSettings) -> None:
         self.settings = settings
-        self._relay_state = False
+        self._relay_states: dict[int, bool] = {}
         self._mock_adc_values: dict[int, int] = {
             0: 450,  # Zone 1: moderately moist
             1: 650,  # Zone 2: dry
@@ -202,6 +215,11 @@ class MockGpio(GpioInterface):
             4: 512,  # Water level: 50%
         }
         self._mock_distance = 25.0  # 25cm water level
+        
+        # Initialize relay states for both primary and secondary pump (if configured)
+        self._relay_states[self.settings.pump_relay_pin] = False
+        if self.settings.pump_relay_pin_2 > 0 and self.settings.pump_relay_pin_2 != self.settings.pump_relay_pin:
+            self._relay_states[self.settings.pump_relay_pin_2] = False
 
         logger.info("Mock GPIO initialized (development mode)")
 
@@ -238,15 +256,18 @@ class MockGpio(GpioInterface):
         await asyncio.sleep(0.01)  # Simulate measurement delay
         return round(distance, 1)
 
-    async def set_relay(self, state: bool) -> None:
+    async def set_relay(self, pin: int, state: bool) -> None:
         """Set mock relay state."""
-        self._relay_state = state
-        logger.debug("Mock relay set to %s", "ON" if state else "OFF")
+        if pin not in self._relay_states:
+            raise RuntimeError(f"Relay on pin {pin} not configured")
+        
+        self._relay_states[pin] = state
+        logger.debug("Mock relay pin %d set to %s", pin, "ON" if state else "OFF")
         await asyncio.sleep(0.001)
 
-    def get_relay_state(self) -> bool:
+    def get_relay_state(self, pin: int) -> bool:
         """Get current relay state."""
-        return self._relay_state
+        return self._relay_states.get(pin, False)
 
     async def cleanup(self) -> None:
         """Cleanup (no-op for mock)."""

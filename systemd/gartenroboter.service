@@ -28,7 +28,19 @@ StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=gartenroboter
 
-# Security hardening
+# ===== Pi Zero 2 W Resource Limits =====
+# 512MB RAM, so cap memory to stay under 256MB
+MemoryLimit=256M
+MemoryAccounting=yes
+
+# Limit CPU to prevent fork bombs (2 cores, use ~1.5)
+CPUQuota=75%
+CPUAccounting=yes
+
+# Prevent OOM from crashing the whole system
+OOMPolicy=kill
+
+# ===== Security hardening =====
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=read-only

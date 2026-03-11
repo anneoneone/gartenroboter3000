@@ -1,12 +1,12 @@
 [project]
 name = "gartenroboter"
 version = "0.1.0"
-description = "Raspberry Pi garden automation system with soil moisture monitoring, pump control, and Telegram integration"
+description = "Raspberry Pi Zero 2 W garden automation system with soil moisture monitoring, pump control, and Telegram integration"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "Anton" }]
-keywords = ["raspberry-pi", "garden", "automation", "iot", "telegram"]
+keywords = ["raspberry-pi", "raspberry-pi-zero-2-w", "garden", "automation", "iot", "telegram"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
@@ -16,6 +16,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Home Automation",
+    "Natural Language :: English",
 ]
 
 dependencies = [

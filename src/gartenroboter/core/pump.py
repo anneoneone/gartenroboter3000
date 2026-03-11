@@ -58,10 +58,22 @@ class PumpController:
         gpio: GpioInterface,
         settings: PumpSettings,
         gpio_settings: GpioSettings,
+        pump_id: int = 1,
     ) -> None:
         self.gpio = gpio
         self.settings = settings
         self.gpio_settings = gpio_settings
+        self.pump_id = pump_id
+        
+        # Determine which relay pin to use (1 → pump_relay_pin, 2 → pump_relay_pin_2)
+        if pump_id == 1:
+            self.relay_pin = gpio_settings.pump_relay_pin
+        elif pump_id == 2:
+            self.relay_pin = gpio_settings.pump_relay_pin_2
+            if self.relay_pin <= 0:
+                raise ValueError("Second pump relay pin not configured (GPIO_PUMP_RELAY_PIN_2)")
+        else:
+            raise ValueError(f"Invalid pump_id: {pump_id} (must be 1 or 2)")
 
         self._state = PumpState.IDLE
         self._current_zone: int | None = None
@@ -73,6 +85,8 @@ class PumpController:
         self._running_task: asyncio.Task[None] | None = None
         self._cooldown_task: asyncio.Task[None] | None = None
         self._lock = asyncio.Lock()
+        
+        logger.info("Pump %d initialized (relay pin: %d)", pump_id, self.relay_pin)
 
     def _reset_daily_counter(self) -> None:
         """Reset daily runtime counter if new day."""
@@ -178,14 +192,15 @@ class PumpController:
 
         async with self._lock:
             try:
-                await self.gpio.set_relay(self.gpio_settings.pump_relay_pin, True)
+                await self.gpio.set_relay(self.relay_pin, True)
                 self._state = PumpState.RUNNING
                 self._current_zone = zone_id
                 self._start_time = datetime.now(UTC)
                 self._error_message = None
 
                 logger.info(
-                    "Pump started for zone %d, max duration: %.0fs, reason: %s",
+                    "Pump %d started for zone %d, max duration: %.0fs, reason: %s",
+                    self.pump_id,
                     zone_id,
                     max_duration,
                     reason,
@@ -240,7 +255,7 @@ class PumpController:
             zone_id = self._current_zone
 
             try:
-                await self.gpio.set_relay(self.gpio_settings.pump_relay_pin, False)
+                await self.gpio.set_relay(self.relay_pin, False)
 
                 self._total_runtime_today += runtime
                 self._last_stop_time = datetime.now(UTC)
@@ -297,7 +312,7 @@ class PumpController:
             zone_id = self._current_zone
 
             try:
-                await self.gpio.set_relay(self.gpio_settings.pump_relay_pin, False)
+                await self.gpio.set_relay(self.relay_pin, False)
             except Exception:
                 logger.exception("Emergency stop GPIO failed")
 

@@ -72,12 +72,17 @@ class WateringEngine:
         pump_controller: PumpController,
         sun_tracker: SunTracker,
         weather_service: WeatherService,
+        pump_controller_2: PumpController | None = None,
     ) -> None:
         self.settings = settings
         self.sensors = sensor_manager
         self.pump = pump_controller
+        self.pump_2 = pump_controller_2
         self.sun = sun_tracker
         self.weather = weather_service
+        
+        if pump_controller_2:
+            logger.info("Watering engine initialized with dual pump support")
 
     async def _check_preconditions(
         self,
@@ -129,14 +134,26 @@ class WateringEngine:
         except Exception as e:
             logger.warning("Weather check failed, continuing: %s", e)
 
-        # Check pump availability
-        can_start, pump_message = await self.pump.can_start()
-        if not can_start:
-            return (
-                False,
-                WateringDecision.SKIP_PUMP_UNAVAILABLE,
-                f"Pump unavailable: {pump_message}",
-            )
+        # Check pump availability (support dual pumps)
+        pump_1_ready, pump_1_msg = await self.pump.can_start()
+        
+        if self.pump_2:
+            pump_2_ready, pump_2_msg = await self.pump_2.can_start()
+            # At least one pump must be ready
+            if not (pump_1_ready or pump_2_ready):
+                return (
+                    False,
+                    WateringDecision.SKIP_PUMP_UNAVAILABLE,
+                    f"Both pumps unavailable: P1={pump_1_msg}, P2={pump_2_msg}",
+                )
+        else:
+            # Single pump mode
+            if not pump_1_ready:
+                return (
+                    False,
+                    WateringDecision.SKIP_PUMP_UNAVAILABLE,
+                    f"Pump unavailable: {pump_1_msg}",
+                )
 
         return True, WateringDecision.WATER, "Preconditions met"
 
@@ -185,6 +202,22 @@ class WateringEngine:
             reason=f"Zone {zone_id} needs water: {moisture:.1f}% < {threshold}%",
             soil_moisture_percent=soil_reading.moisture_percent,
         )
+    
+    def _select_pump(self, zone_id: int) -> PumpController:
+        """
+        Select which pump to use for a zone.
+        
+        Strategy with dual pumps:
+        - Odd zones (1, 3) → Pump 1
+        - Even zones (2, 4) → Pump 2
+        
+        This allows simultaneous watering of zone 1 and zone 2, etc.
+        """
+        if self.pump_2 is None:
+            return self.pump
+        
+        # Use pump 2 for even zones, pump 1 for odd zones
+        return self.pump_2 if zone_id % 2 == 0 else self.pump
 
     async def water_zone(
         self,
@@ -201,7 +234,10 @@ class WateringEngine:
         Returns:
             WateringResult with pump event
         """
-        pump_event = await self.pump.start(
+        # Select appropriate pump for this zone
+        pump = self._select_pump(zone_id)
+        
+        pump_event = await pump.start(
             zone_id=zone_id,
             reason=reason,
         )
@@ -225,7 +261,9 @@ class WateringEngine:
         """
         Run a full watering cycle - check all zones and water if needed.
 
-        Strategy: Water ANY zone that is dry (one at a time, with cooldown between).
+        Strategy: Water zones in parallel using available pumps (with cooldown between same pump).
+        - With two pumps: Odd zones (1,3) use pump 1, even zones (2,4) use pump 2
+        - Allows simultaneous watering when using different pumps
 
         Returns:
             WateringCycleResult with all zone results
@@ -248,7 +286,7 @@ class WateringEngine:
                 result = await self.check_zone(zone_id, soil_reading, readings)
 
                 if result.decision == WateringDecision.WATER:
-                    # Water this zone
+                    # Water this zone (selects appropriate pump)
                     water_result = await self.water_zone(
                         zone_id=zone_id,
                         reason="auto_cycle",
@@ -258,9 +296,9 @@ class WateringEngine:
                         zones_watered += 1
                         logger.info("Watered zone %d", zone_id)
 
-                        # Wait for pump to finish (it auto-stops after max_runtime)
-                        # The pump has cooldown, so next zone will wait if needed
-                        await self._wait_for_pump()
+                        # Wait for the selected pump to finish (it auto-stops after max_runtime)
+                        pump = self._select_pump(zone_id)
+                        await self._wait_for_pump(pump)
                     else:
                         zones_skipped += 1
                         result = water_result
@@ -295,12 +333,20 @@ class WateringEngine:
 
         return cycle_result
 
-    async def _wait_for_pump(self) -> None:
-        """Wait for pump to finish running."""
+    async def _wait_for_pump(self, pump: PumpController | None = None) -> None:
+        """
+        Wait for a specific pump to finish running.
+        
+        Args:
+            pump: Pump to wait for (defaults to self.pump if None)
+        """
         import asyncio
+        
+        if pump is None:
+            pump = self.pump
 
         while True:
-            status = await self.pump.get_status()
+            status = await pump.get_status()
             if not status.is_running:
                 break
             await asyncio.sleep(1)
