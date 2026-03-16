@@ -58,22 +58,11 @@ class PumpController:
         gpio: GpioInterface,
         settings: PumpSettings,
         gpio_settings: GpioSettings,
-        pump_id: int = 1,
     ) -> None:
         self.gpio = gpio
         self.settings = settings
         self.gpio_settings = gpio_settings
-        self.pump_id = pump_id
-        
-        # Determine which relay pin to use (1 → pump_relay_pin, 2 → pump_relay_pin_2)
-        if pump_id == 1:
-            self.relay_pin = gpio_settings.pump_relay_pin
-        elif pump_id == 2:
-            self.relay_pin = gpio_settings.pump_relay_pin_2
-            if self.relay_pin <= 0:
-                raise ValueError("Second pump relay pin not configured (GPIO_PUMP_RELAY_PIN_2)")
-        else:
-            raise ValueError(f"Invalid pump_id: {pump_id} (must be 1 or 2)")
+        self.relay_pin = gpio_settings.pump_relay_pin
 
         self._state = PumpState.IDLE
         self._current_zone: int | None = None
@@ -86,7 +75,7 @@ class PumpController:
         self._cooldown_task: asyncio.Task[None] | None = None
         self._lock = asyncio.Lock()
         
-        logger.info("Pump %d initialized (relay pin: %d)", pump_id, self.relay_pin)
+        logger.info("Pump initialized (relay pin: %d)", self.relay_pin)
 
     def _reset_daily_counter(self) -> None:
         """Reset daily runtime counter if new day."""
@@ -199,8 +188,7 @@ class PumpController:
                 self._error_message = None
 
                 logger.info(
-                    "Pump %d started for zone %d, max duration: %.0fs, reason: %s",
-                    self.pump_id,
+                    "Pump started for zone %d, max duration: %.0fs, reason: %s",
                     zone_id,
                     max_duration,
                     reason,

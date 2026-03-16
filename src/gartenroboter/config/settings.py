@@ -179,7 +179,7 @@ class GpioSettings(BaseSettings):
         description="MCP3008 channel for water level",
     )
     pump_relay_pin: int = Field(default=17, description="Pump relay GPIO pin")
-    pump_relay_pin_2: int = Field(default=27, description="Second pump relay GPIO pin (optional, for dual pump)", ge=0)
+
     ultrasonic_trigger_pin: int = Field(
         default=23,
         description="HC-SR04 trigger pin",

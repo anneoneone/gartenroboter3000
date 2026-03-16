@@ -82,20 +82,9 @@ RPi 4 offers significant advantages over Pi Zero 2 W:
 | Water Pump | 12V DC submersible | 1-2 | 2-5W typical; 2 pumps allow simultaneous watering |
 | Pump Power Supply | 12V ≥2A DC adapter | 1 | Separate from Pi power (no shared ground until relay) |
 
-### Single Pump vs Dual Pump Comparison
-
-| Feature | Single Pump | Dual Pump Setup |
-|---------|------------|-----------------|
-| **Relay GPIO pins** | GPIO 17 | GPIO 17 + GPIO 27 |
-| **Configuration** | `GPIO_PUMP_RELAY_PIN_2=0` | `GPIO_PUMP_RELAY_PIN_2=27` |
-| **Watering time** | Serial (zones 1→2→3→4) | Parallel (1+2 simultaneous, 3+4 simultaneous) |
-| **Cost** | $ | $$ (1 extra relay + 1 extra pump) |
-| **Typical runtime** | 10-15 minutes per cycle | 5-8 minutes per cycle |
-| **Recommended for** | Small garden (1-2 zones) | Larger garden (4 zones) |
-
 ## Wiring Diagram
 
-### Single Pump Setup (Default)
+### Pump Setup
 
 ```
 Raspberry Pi GPIO Pinout:
@@ -192,47 +181,6 @@ MCP3008 VSS (pin 15 or any other GND pin) ──► Raspberry Pi GND
 Voltage Divider for HC-SR04 Echo (5V → 3.3V):
   Echo ──┬── 1kΩ ──► GPIO24
          └── 2kΩ ──► GND
-```
-
-### Dual Pump Setup (Parallel Watering)
-
-```
-Raspberry Pi GPIO Pinout (with 2nd pump):
-┌──────────────────────────────────────┐
-│  3V3 (1) (2) 5V                      │
-│  SDA (3) ◄─► BMP280 SDA              │
-│  SCL (5) ◄─► BMP280 SCL              │
-│  GP4 (7) (8) TX                      │
-│  GND (9) (10) RX                     │
-│ GP17 (11) ────────────► Pump 1 Relay │
-│ GP18 (12) (13) GP27 ──► Pump 2 Relay │
-│ GP22 (14) (15) GND                   │
-│ GP23 (16) ────────────► HC-SR04 Trigger
-│ GP24 (18) ◄─[Divider]─── HC-SR04 Echo
-│  GND (20) (21) GP9                   │
-│  CE0 (24) ────────────► MCP3008 CS   │
-│ MOSI (19) ────────────► MCP3008 DIN  │
-│ MISO (21) ◄───────────── MCP3008 DOUT
-│ SCLK (23) ────────────► MCP3008 CLK  │
-│                                      │
-│ BMP280 (I2C):                        │
-│  3V3 ──────────────────► VCC         │
-│  GND ──────────────────► GND         │
-│  SDA (GPIO 2, pin 3) ──► SDA         │
-│  SCL (GPIO 3, pin 5) ──► SCL         │
-└──────────────────────────────────────┘
-
-Zone-to-Pump Mapping (with dual pumps):
-  Zone 1 (odd)   → Pump 1 (GPIO 17)
-  Zone 2 (even)  → Pump 2 (GPIO 27)  ← Can water Zone 1 & 2 simultaneously!
-  Zone 3 (odd)   → Pump 1 (GPIO 17)
-  Zone 4 (even)  → Pump 2 (GPIO 27)  ← Can water Zone 3 & 4 simultaneously!
-
-MCP3008 ADC Channels: (same as single pump)
-  CH0 ◄── Soil Sensor Zone 1
-  CH1 ◄── Soil Sensor Zone 2
-  CH2 ◄── Soil Sensor Zone 3
-  CH3 ◄── Soil Sensor Zone 4
 ```
 
 ### GY BMP280 Sensor Wiring (Optional - I2C Temperature & Pressure)
@@ -669,33 +617,6 @@ DATABASE_RETENTION_DAYS=180         # Default: 90 → RPi 4: 180 days
 ```
 
 See `.env.example` for all options and defaults.
-
-### Dual Pump Configuration
-
-To enable parallel watering with two pumps, add the second pump relay GPIO pin to your `.env` file:
-
-```dotenv
-# Single pump (default)
-GPIO_PUMP_RELAY_PIN=17
-GPIO_PUMP_RELAY_PIN_2=0          # Disabled
-
-# Dual pump setup (parallel watering)
-GPIO_PUMP_RELAY_PIN=17           # Pump 1 (zones 1, 3)
-GPIO_PUMP_RELAY_PIN_2=27         # Pump 2 (zones 2, 4) - can run simultaneously!
-```
-
-**Zone Distribution (with dual pumps):**
-- Zone 1 (odd) → Pump 1 (GPIO 17)
-- Zone 2 (even) → Pump 2 (GPIO 27) — **Can water simultaneously with Zone 1!**
-- Zone 3 (odd) → Pump 1 (GPIO 17)
-- Zone 4 (even) → Pump 2 (GPIO 27) — **Can water simultaneously with Zone 3!**
-
-**Benefits of dual pump:**
-- ✅ Reduces watering cycle time by ~50% (5-8m vs 10-15m)
-- ✅ Allows simultaneous watering of two zones
-- ✅ Better for larger gardens
-- ❌ Requires second pump, second relay module, additional GPIO pin
-- ❌ Uses more water pumping capacity (both pumps can run in parallel)
 
 ### Required Settings
 

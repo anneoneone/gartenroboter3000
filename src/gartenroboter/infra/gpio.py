@@ -86,17 +86,6 @@ class RealGpio(GpioInterface):
                 initial_value=False,
             )
             self._relay_states[self.settings.pump_relay_pin] = False
-            
-            # Initialize second pump relay if configured
-            if self.settings.pump_relay_pin_2 > 0 and self.settings.pump_relay_pin_2 != self.settings.pump_relay_pin:
-                self._relays[self.settings.pump_relay_pin_2] = DigitalOutputDevice(
-                    self.settings.pump_relay_pin_2,
-                    active_high=True,
-                    initial_value=False,
-                )
-                self._relay_states[self.settings.pump_relay_pin_2] = False
-                logger.info("Dual pump mode enabled (pins %d and %d)", 
-                           self.settings.pump_relay_pin, self.settings.pump_relay_pin_2)
 
             # Initialize ultrasonic sensor
             self._trigger = DigitalOutputDevice(
@@ -216,10 +205,8 @@ class MockGpio(GpioInterface):
         }
         self._mock_distance = 25.0  # 25cm water level
         
-        # Initialize relay states for both primary and secondary pump (if configured)
+        # Initialize relay state for pump
         self._relay_states[self.settings.pump_relay_pin] = False
-        if self.settings.pump_relay_pin_2 > 0 and self.settings.pump_relay_pin_2 != self.settings.pump_relay_pin:
-            self._relay_states[self.settings.pump_relay_pin_2] = False
 
         logger.info("Mock GPIO initialized (development mode)")
 

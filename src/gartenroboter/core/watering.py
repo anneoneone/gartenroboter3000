@@ -72,17 +72,12 @@ class WateringEngine:
         pump_controller: PumpController,
         sun_tracker: SunTracker,
         weather_service: WeatherService,
-        pump_controller_2: PumpController | None = None,
     ) -> None:
         self.settings = settings
         self.sensors = sensor_manager
         self.pump = pump_controller
-        self.pump_2 = pump_controller_2
         self.sun = sun_tracker
         self.weather = weather_service
-        
-        if pump_controller_2:
-            logger.info("Watering engine initialized with dual pump support")
 
     async def _check_preconditions(
         self,
@@ -134,26 +129,14 @@ class WateringEngine:
         except Exception as e:
             logger.warning("Weather check failed, continuing: %s", e)
 
-        # Check pump availability (support dual pumps)
-        pump_1_ready, pump_1_msg = await self.pump.can_start()
-        
-        if self.pump_2:
-            pump_2_ready, pump_2_msg = await self.pump_2.can_start()
-            # At least one pump must be ready
-            if not (pump_1_ready or pump_2_ready):
-                return (
-                    False,
-                    WateringDecision.SKIP_PUMP_UNAVAILABLE,
-                    f"Both pumps unavailable: P1={pump_1_msg}, P2={pump_2_msg}",
-                )
-        else:
-            # Single pump mode
-            if not pump_1_ready:
-                return (
-                    False,
-                    WateringDecision.SKIP_PUMP_UNAVAILABLE,
-                    f"Pump unavailable: {pump_1_msg}",
-                )
+        # Check pump availability
+        pump_ready, pump_msg = await self.pump.can_start()
+        if not pump_ready:
+            return (
+                False,
+                WateringDecision.SKIP_PUMP_UNAVAILABLE,
+                f"Pump unavailable: {pump_msg}",
+            )
 
         return True, WateringDecision.WATER, "Preconditions met"
 
@@ -207,17 +190,9 @@ class WateringEngine:
         """
         Select which pump to use for a zone.
         
-        Strategy with dual pumps:
-        - Odd zones (1, 3) → Pump 1
-        - Even zones (2, 4) → Pump 2
-        
-        This allows simultaneous watering of zone 1 and zone 2, etc.
+        With single pump setup, always uses the only pump.
         """
-        if self.pump_2 is None:
-            return self.pump
-        
-        # Use pump 2 for even zones, pump 1 for odd zones
-        return self.pump_2 if zone_id % 2 == 0 else self.pump
+        return self.pump
 
     async def water_zone(
         self,
