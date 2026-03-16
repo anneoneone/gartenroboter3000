@@ -28,7 +28,7 @@ StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=gartenroboter
 
-# ===== Pi Zero 2 W Resource Limits =====
+# ===== Raspberry Pi 4 Resource Configuration =====
 # 512MB RAM, so cap memory to stay under 256MB
 MemoryLimit=256M
 MemoryAccounting=yes

@@ -1,14 +1,14 @@
 # 🌱 Gartenroboter3000
 
-**Optimized for Raspberry Pi Zero 2 W** — Garden automation system with intelligent watering control, soil monitoring, and Telegram integration.
+**Optimized for Raspberry Pi 4 Model B** — Garden automation system with intelligent watering control, soil monitoring, and Telegram integration.
 
-**📖 Contents:** [Quick Start](#-quick-start) · [Features](#features) · [Hardware](#hardware-requirements) · [Installation](#installation-pi-zero-2-w) · [Configuration](#configuration) · [Telegram Bot](#telegram-bot-commands) · [Pi Zero 2 W Optimization](#-raspberry-pi-zero-2-w-optimization) · [Troubleshooting](#troubleshooting) · [Development](#development)
+**📖 Contents:** [Quick Start](#-quick-start) · [Features](#features) · [Hardware](#hardware-requirements) · [Installation](#installation-raspberry-pi-4) · [Configuration](#configuration) · [Telegram Bot](#telegram-bot-commands) · [RPi 4 Optimization](#-raspberry-pi-4-model-b-optimization) · [Troubleshooting](#troubleshooting) · [Development](#development)
 
-## ⚡ Quick Start (Pi Zero 2 W)
+## ⚡ Quick Start (Raspberry Pi 4)
 
 ### Prerequisites
-- Raspberry Pi Zero 2 W with 32GB microSD card (Sandisk gives 23GB usable)
-- Decent power supply (**3A @ 5V recommended**; weak power causes Pi Zero 2 W instability)
+- Raspberry Pi 4 Model B (2GB RAM minimum, 4GB+ recommended) with 32GB microSD card
+- Power supply (**5V @ 3A minimum, 5V @ 5A recommended** for USB peripherals)
 - 30 minutes of setup time
 
 ### Installation
@@ -47,11 +47,31 @@ journalctl -u gartenroboter -n 20 -f
 - **Pi Health Monitoring** — Temperature warnings to prevent overheating
 - **Data Logging** — SQLite database with 90-day retention
 
+## 🎯 Raspberry Pi 4 Model B Optimization
+
+RPi 4 offers significant advantages over Pi Zero 2 W:
+
+| Feature | RPi 4 (2GB) | Pi Zero 2 W |
+|---------|------------|------------|
+| CPU | BCM2711 (4x 1.5GHz ARM Cortex-A72) | BCM2710A1 (4x 1GHz ARM Cortex-A53) |
+| RAM | 2GB LPDDR4 | 512MB/1GB |
+| Storage I/O | Gigabit Ethernet | USB 2.0 (slower) |
+| Temperature | Runs cooler (~50°C idle) | Gets hot under load (~65°C) |
+| **Monitoring Intervals** | **15-30 seconds** (aggressive) | **60 seconds** (conservative) |
+| **Data Retention** | **180 days** (large storage capacity) | **45 days** (limited storage) |
+
+**Optimizations applied for RPi 4:**
+- Shorter sensor polling intervals (15 seconds vs 60+)
+- More aggressive weather API checks for real-time conditions
+- Extended data retention for historical analysis
+- No frequency scaling concerns (better sustained performance)
+- Can safely run additional monitoring tasks in parallel
+
 ## Hardware Requirements
 
 | Component | Model/Spec | Qty | Notes |
 |-----------|------------|-----|-------|
-| **Raspberry Pi** | **Pi Zero 2 W** | 1 | ✅ Officially supported (1GHz ARM Cortex-A53 dual-core) |
+| **Raspberry Pi** | **Raspberry Pi 4 Model B** | 1 | ✅ Officially supported (1.5GHz ARM Cortex-A72 quad-core) |
 | MicroSD Card | 32GB Class 10+ (SanDisk recommended) | 1 | ~23GB usable; avoid cheap brands |
 | Power Supply | **5V 3A USB-C** | 1 | ⚠️ **Critical for stability!** Low power causes random crashes |
 | ADC Converter | MCP3008 (8-channel, 10-bit SPI) | 1 | Required for soil moisture sensors |
@@ -434,7 +454,7 @@ Contact your relay module supplier for a diagram, then:
 
 ```
 
-## Installation (Pi Zero 2 W)
+## Installation (Raspberry Pi 4)
 
 ### Step-by-Step Setup
 
@@ -447,7 +467,7 @@ Contact your relay module supplier for a diagram, then:
 # - Set WiFi SSID and password
 ```
 
-**2. Boot Pi Zero 2 W and SSH in**
+**2. Boot Raspberry Pi 4 and SSH in**
 ```bash
 ssh pi@gartenroboter.local
 # Default password: raspberry
@@ -563,22 +583,22 @@ LOCATION_TIMEZONE=Europe/Berlin
 
 Configuration is managed via environment variables in `.env` file (encrypted at rest by systemd) and can be updated at runtime via Telegram bot.
 
-### Pi Zero 2 W Specific Tuning
+### Raspberry Pi 4 Specific Tuning
 
 ```dotenv
-# ✅ RECOMMENDED for Pi Zero 2 W (from .env.example):
+# ✅ RECOMMENDED for Raspberry Pi 4 (from .env.example):
 
-# Reduce sensor polling to save CPU (not safety-critical)
-SCHEDULER_SENSOR_INTERVAL=60        # Default: 30s → Pi Zero 2 W: 60s
+# Aggressive sensor polling for real-time monitoring
+SCHEDULER_SENSOR_INTERVAL=15        # Default: 30s → RPi 4: 15s
 
-# Larger watering interval to reduce interrupt frequency  
-SCHEDULER_WATERING_INTERVAL=600     # Default: 300s → Pi Zero 2 W: 600s
+# Shorter watering interval for responsive control  
+SCHEDULER_WATERING_INTERVAL=300     # Default: 300s → RPi 4: maintain default
 
-# Slightly more conservative thresholds
-SENSOR_SOIL_THRESHOLD_DRY=35        # Default: 30% → Pi Zero 2 W: 35%
+# Standard thresholds (Pi 4 handles more aggressive settings)
+SENSOR_SOIL_THRESHOLD_DRY=30        # Default: 30% → RPi 4: maintain default
 
-# Shorter database retention to save disk
-DATABASE_RETENTION_DAYS=30          # Default: 90 → Pi Zero 2 W: 30-45 days
+# Extended database retention with plenty of storage
+DATABASE_RETENTION_DAYS=180         # Default: 90 → RPi 4: 180 days
 ```
 
 See `.env.example` for all options and defaults.
@@ -770,56 +790,57 @@ uv run pytest -v
 uv run pytest -x
 ```
 
-## 🚀 Raspberry Pi Zero 2 W Optimization
+## 🚀 Raspberry Pi 4 Model B Optimization
 
-The Pi Zero 2 W has real hardware constraints—this project handles them:
+Raspberry Pi 4 is powerful enough to handle aggressive monitoring without constraints:
 
 ### Resource Management
 
-| Resource | Pi Zero 2 W Limit | Gartenroboter Strategy |
-|----------|------------------|------------------------|
-| **RAM** | 512 MB | Async I/O (non-blocking), minimal caching, efficient async loops |
-| **CPU** | 1 GHz dual-core | Sensor polling every 60s (not 30s), watering checks every 10m |
-| **Disk** | ~20 GB usable | 30-day data retention (not 90), SQLite with WAL mode for efficiency |
-| **I/O** | Shared USB bus | SPI/I2C use efficient protocol stacks, GPIO via `/sys/class/gpio` |
+| Resource | RPi 4 (2GB+) | Strategy |
+|----------|-------------|----------|
+| **RAM** | 2-8 GB | Full caching, parallel operations, no memory constraints |
+| **CPU** | 1.5 GHz quad-core | Sensor polling every 15s (aggressive monitoring), fast processing |
+| **Disk** | 32+ GB available | 180-day data retention, full SQLite capabilities |
+| **I/O** | Gigabit Ethernet | Responsive API calls, real-time weather updates |
 
 ### Recommended Hardware Setup
 
 ```
 ┌─────────────────────────────────────────┐
-│  Pi Zero 2 W                            │
-│  ├─ 3A @ 5V power (critical!)           │
-│  ├─ Active cooling not needed           │
-│  └─ ~0.3W idle, 0.5-0.8W running       │
+│  Raspberry Pi 4 Model B                 │
+│  ├─ 5V @ 3A minimum, 5A recommended    │
+│  ├─ Optional: Aluminum heatsink         │
+│  └─ ~0.6W idle, 1.5-2.5W running       │
 ├─────────────────────────────────────────┤
-│  Peripherals (all optional):            │
-│  ├─ MCP3008 ADC (SPI, low power)       │
-│  ├─ HC-SR04 ultrasonic (GPIO, 2mA)    │
+│  Recommended Additions:                 │
+│  ├─ MCP3008 ADC (SPI, efficient)       │
+│  ├─ HC-SR04 ultrasonic (GPIO, GPIO)    │
 │  ├─ 4x soil sensors (passive, analog)  │
-│  └─ 5V relay (draws from pump supply)  │
+│  ├─ 2× relay modules (supports dual)   │
+│  └─ External storage (USB 3.0 backup) │
 └─────────────────────────────────────────┘
 ```
 
 ### Performance Notes
 
-- **Cold boot**: ~45-60 seconds
-- **Service startup**: ~8-10 seconds
-- **Telegram response time**: 1-3 seconds (WiFi dependent)
-- **Sensor reading**: 100-150ms per zone
-- **Database query**: <50ms (90-day retention vs 30-day is minimal difference)
+- **Cold boot**: ~20-30 seconds
+- **Service startup**: ~3-5 seconds
+- **Telegram response time**: <1 second (WiFi dependent)
+- **Sensor reading**: 50-100ms per zone
+- **Database query**: <20ms (fast with extended retention)
 
 ### Storage Life Expectancy
 
 With recommended settings:
-- **SanDisk 32GB microSD**: ~3-5 years (light write load)
-- **Kingston 32GB**: ~2-3 years (more sensitive to Pi Zero power fluctuations)
+- **SanDisk 32GB microSD**: ~5-8 years (moderate write load, ideal for RPi 4)
+- **Samsung EVO Plus 32GB**: ~7-10 years (excellent endurance)
+- **Kingston Canvas Go Plus**: ~6-9 years (reliable performance)
 
-**Pro tip**: Disable systemd journal persistence to reduce wear:
+**Pro tip**: Raspberry Pi 4 can safely run with standard journal logging:
 ```bash
-sudo mkdir -p /etc/systemd/journald.conf.d/
-echo '[Journal]' | sudo tee /etc/systemd/journald.conf.d/pi-zero.conf
-echo 'Storage=volatile' | sudo tee -a /etc/systemd/journald.conf.d/pi-zero.conf
-sudo systemctl restart systemd-journald
+# Optional: Enable persistent journaling for better debugging
+sudo systemctl enable systemd-journald
+journalctl --vacuum=60d  # Keep 60 days of logs
 ```
 
 ## Project Structure

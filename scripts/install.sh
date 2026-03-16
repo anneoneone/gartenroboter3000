@@ -1,6 +1,6 @@
 #!/bin/bash
-# Gartenroboter3000 Installation Script (Pi Zero 2 W Optimized)
-# Run on Raspberry Pi Zero 2 W to set up the garden automation system
+# Gartenroboter3000 Installation Script (Raspberry Pi 4 Model B Optimized)
+# Run on Raspberry Pi 4 Model B to set up the garden automation system
 
 set -e
 
@@ -19,7 +19,7 @@ PI_MODEL=""
 
 echo -e "${GREEN}"
 echo "╔═══════════════════════════════════════════════════════════════╗"
-echo "║  Gartenroboter3000 Installation Script (Pi Zero 2 W)          ║"
+echo "║  Gartenroboter3000 Installation Script (Raspberry Pi 4)       ║"
 echo "╚═══════════════════════════════════════════════════════════════╝"
 echo -e "${NC}"
 
@@ -42,20 +42,26 @@ else
     fi
 fi
 
-# Pi Zero 2 W specific optimizations
-if [[ "$PI_MODEL" == *"Pi Zero 2"* ]] || [[ "$PI_MODEL" == *"Zero W"* ]]; then
-    echo -e "${BLUE}ℹ️  Pi Zero 2 W detected - using optimized settings${NC}"
+# Raspberry Pi 4 specific optimizations
+if [[ "$PI_MODEL" == *"Raspberry Pi 4"* ]]; then
+    echo -e "${BLUE}ℹ️  Raspberry Pi 4 detected - using optimized settings${NC}"
+    SENSOR_INTERVAL=15
+    WATERING_INTERVAL=300
+    DATA_RETENTION=180
+elif [[ "$PI_MODEL" == *"Pi Zero 2"* ]] || [[ "$PI_MODEL" == *"Zero W"* ]]; then
+    echo -e "${BLUE}ℹ️  Pi Zero 2 W detected - using conservative settings${NC}"
     SENSOR_INTERVAL=60
     WATERING_INTERVAL=600
     DATA_RETENTION=45
 else
+    echo -e "${YELLOW}⚠️  Unknown Pi model detected - using default settings${NC}"
     SENSOR_INTERVAL=30
     WATERING_INTERVAL=300
     DATA_RETENTION=90
 fi
 
 echo -e "\n${GREEN}[1/7] Updating system packages...${NC}"
-echo -e "${YELLOW}⚠️  Note: This may take 3-5 minutes on Pi Zero 2 W${NC}"
+echo -e "${YELLOW}ℹ️  This typically takes 1-2 minutes on Raspberry Pi 4${NC}"
 sudo apt update && sudo apt upgrade -y
 
 echo -e "\n${GREEN}[2/7] Installing system dependencies...${NC}"
@@ -72,16 +78,18 @@ sudo apt install -y \
     wireless-tools
 
 echo -e "${YELLOW}"
-echo "⚠️  CRITICAL FOR PI ZERO 2 W:"
+echo "⚠️  POWER SUPPLY REQUIREMENTS FOR RASPBERRY PI 4:"
 echo "═══════════════════════════════════════════════════════════"
-echo "Your power supply MUST provide at least 5V @ 3A (15W)"
-echo "Common problems with weak power supplies:"
-echo "  • Random \"brown out\" reboots"
-echo "  • WiFi disconnects"
-echo "  • GPIO/I2C unreliable behavior"
-echo "  • USB device detection fails"
+echo "Minimum: USB-C 5V @ 3A (15W)"
+echo "Recommended: USB-C 5V @ 5A (27W) - especially with USB devices"
 echo ""
-echo "RECOMMENDED: Anker 5V/3A or official Raspberry Pi 27W PSU"
+echo "RECOMMENDED POWER SUPPLIES:"
+echo "  • Official Raspberry Pi 27W USB-C PSU (best option)"
+echo "  • Anker USB-C Power Delivery 65W"
+echo "  • Any certified USB-C PD supply rated for 27W+"
+echo ""
+echo "WARNING: Using micro-USB supplies or low-quality adapters"
+echo "can cause GPIO/I2C instability and mysterious failures!"
 echo "═══════════════════════════════════════════════════════════"
 echo -e "${NC}"
 
@@ -103,7 +111,7 @@ sudo usermod -aG gpio,spi,i2c pi
 
 echo -e "\n${GREEN}[4/7] Installing uv (Python package manager)...${NC}"
 if ! command -v uv &> /dev/null; then
-    echo -e "${YELLOW}Installing uv - may take 1-2 minutes on Pi Zero 2 W${NC}"
+    echo -e "${YELLOW}Installing uv - typically 30 seconds on Raspberry Pi 4${NC}"
     curl -LsSf https://astral.sh/uv/install.sh | sh
     export PATH="$HOME/.local/bin:$PATH"
 else
@@ -132,7 +140,7 @@ if [ "$AVAILABLE_GB" -lt 2 ]; then
 fi
 
 echo -e "\n${GREEN}[6/7] Installing Python dependencies...${NC}"
-echo -e "${YELLOW}This will take 2-4 minutes on Pi Zero 2 W - be patient!${NC}"
+echo -e "${YELLOW}This will take 1-2 minutes on Raspberry Pi 4 - be patient!${NC}"
 cd "$INSTALL_DIR"
 uv sync --python 3.11
 
@@ -179,7 +187,7 @@ sudo systemctl enable $SERVICE_NAME
 
 echo -e "\n${GREEN}"
 echo "╔═══════════════════════════════════════════════════════════════╗"
-echo "║      🎉 Gartenroboter3000 Setup Complete! (Pi Zero 2 W)      ║"
+echo "║     🎉 Gartenroboter3000 Setup Complete! (Raspberry Pi 4)   ║"
 echo "╚═══════════════════════════════════════════════════════════════╝"
 echo -e "${NC}"
 
@@ -198,18 +206,18 @@ ${YELLOW}⚡ NEXT STEPS:${NC}
 4. ${GREEN}sudo reboot${NC}
    Reboot if SPI/I2C were just enabled
 
-${BLUE}🔧 PI ZERO 2 W OPTIMIZATION:${NC}
+${BLUE}🔧 RASPBERRY PI 4 OPTIMIZATION:${NC}
 
-This installation is optimized for Pi Zero 2 W:
-  ✓ Sensor polling: 60s (not 30s) to reduce CPU load
-  ✓ Watering checks: 10m (not 5m) to reduce interrupt frequency
-  ✓ Data retention: 45 days (not 90) to save ~5GB disk space
-  ✓ Python 3.11: Async I/O for resource efficiency
+This installation is optimized for Raspberry Pi 4 Model B:
+  ✓ Sensor polling: 15s (aggressive monitoring) for real-time responsiveness
+  ✓ Watering checks: 5m (standard interval) with fast processing
+  ✓ Data retention: 180 days (extended history) with ample storage
+  ✓ Python 3.11: Full async I/O with parallel operations
 
-Edit these in .env if needed:
-  ${GREEN}SCHEDULER_SENSOR_INTERVAL=60${NC}
-  ${GREEN}SCHEDULER_WATERING_INTERVAL=600${NC}
-  ${GREEN}DATABASE_RETENTION_DAYS=45${NC}
+Edit these in .env if needed or for Pi Zero 2 W fallback:
+  ${GREEN}SCHEDULER_SENSOR_INTERVAL=15${NC}     (RPi 4) or 60 (Pi Zero 2W)
+  ${GREEN}SCHEDULER_WATERING_INTERVAL=300${NC}  (RPi 4) or 600 (Pi Zero 2W)
+  ${GREEN}DATABASE_RETENTION_DAYS=180${NC}      (RPi 4) or 45 (Pi Zero 2W)
 
 ${YELLOW}⚠️  IMPORTANT - Pin Configuration:${NC}
 
