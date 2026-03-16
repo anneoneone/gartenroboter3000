@@ -78,8 +78,8 @@ RPi 4 offers significant advantages over Pi Zero 2 W:
 | Soil Moisture Sensor | Capacitive (not resistive!) | 4 | Resistive sensors corrode quickly |
 | Water Level Sensor | HC-SR04 (ultrasonic) | 1 | Requires voltage divider (5V → 3.3V) on echo pin |
 | Environmental Sensor | GY BMP280 (I2C) | 1 | Optional; measures temperature & air pressure |
-| Relay Module | 5V 1-channel with optocoupler | 1-2 | 1 for single pump, 2 for parallel dual-pump setup |
-| Water Pump | 12V DC submersible | 1-2 | 2-5W typical; 2 pumps allow simultaneous watering |
+| Relay Module | 5V 1-channel with optocoupler | 1 | Controls single pump via GPIO 17 |
+| Water Pump | 12V DC submersible | 1 | 2-5W typical; single pump for all zones |
 | Pump Power Supply | 12V ≥2A DC adapter | 1 | Separate from Pi power (no shared ground until relay) |
 
 ## Wiring Diagram
@@ -95,7 +95,7 @@ Raspberry Pi GPIO Pinout:
 │  GP4 (7) (8) TX                     │
 │  GND (9) (10) RX                    │
 │ GP17 (11) ─────────────► Pump Relay │
-│ GP18 (12) (13) GP27                 │
+│ GP18 (12) (13) GND                  │
 │ GP22 (14) (15) GND                  │
 │ GP23 (16) ─────────────► HC-SR04 Trigger
 │ GP24 (18) ◄──[Voltage Divider]── HC-SR04 Echo
@@ -237,67 +237,58 @@ i2cdetect -y 1
 # Should show your address (76 or 77) in the grid
 ```
 
-### 2-Channel Relay Module Wiring (10A 1U Relay Board)
+### 1-Channel Relay Module Wiring (5V with optocoupler)
 
 **Relay Module Pinout:**
 ```
-┌────────────────────────────────────────────────┐
-│       2-CHANNEL RELAY MODULE (1U / 10A)        │
-├────────────────────────────────────────────────┤
-│                                                │
-│  Power Section:        Control Section:       │
-│  ┌─────────────────┐   ┌─────────────────┐   │
-│  │ JD-VCC ├─────┐ │   │ GND  │VCC  │IN1 │   │
-│  │  12V ──┤ ┌┐  │ │   │ GND ─┼─── ┼─── │   │
-│  │ GND ───┤ └┘  │ │   │ GND  │    │IN2 │   │
-│  │        └─────┘ │   └─────────────────┘   │
-│  │  (Jumper: keep on to use Pi 5V for coil) │
-│  └─────────────────┘                         │
-│                                                │
-│  Relay 1 Contacts:    Relay 2 Contacts:      │
-│  ┌─────────────────┐  ┌─────────────────┐   │
-│  │ 1-1 │ 1-2 │ 1-3 │  │ 2-1 │ 2-2 │ 2-3 │   │
-│  │ NC  │ COM │ NO  │  │ NC  │ COM │ NO  │   │
-│  └─────────────────┘  └─────────────────┘   │
-│                                                │
-└────────────────────────────────────────────────┘
+┌──────────────────────────────┐
+│  1-CHANNEL RELAY MODULE       │
+├──────────────────────────────┤
+│                              │
+│  Power Section:              │
+│  ┌────────────────────────┐  │
+│  │ GND  │ VCC  │ IN       │  │
+│  │ GND ─┼──── ┼────────── │  │
+│  │ GND  │ 5V  │ IN        │  │
+│  │      └────────────────┘   │
+│  │ (5V powered relay coil)    │
+│  └────────────────────────────┘
+│                              │
+│  Relay Contacts:            │
+│  ┌────────────────────────┐  │
+│  │ NC   │ COM  │ NO       │  │
+│  │ (-)  │ (-)  │ (+)      │  │
+│  └────────────────────────┘  │
+│                              │
+└──────────────────────────────┘
 ```
 
 **Complete Relay Wiring Diagram:**
 
 ```
-RASPBERRY PI                          2CH RELAY MODULE                    12V POWER SUPPLY
-─────────────────────────────────────────────────────────────────────────────────────
+RASPBERRY PI                     1CH RELAY MODULE              12V POWER SUPPLY
+─────────────────────────────────────────────────────────────────────────────
 
-Pump 1 Circuit:
+Pump Circuit:
 ─────────────
-GPIO 17 ──────────────────────────────► IN1                          
-                                                                      
-                                   ┌─ JD-VCC (12V) ◄──────────── +12V (from DC supply)
-                                   │                              
-             ┌────────────────────►│─ GND         ◄───┐          
-             │                     │                   │
-             │                     │  [Relay Ch1]    ±12V, 2A DC Adapter
-             │                     │                   │
-             │  ┌─────────────────►│─ VCC (5V) ◄──── GND (return)
+GPIO 17 (pin 11) ────────────────────► IN (control signal)
+                                                          
+                                   ┌─ GND (return) ◄───┐          
+                                   │                    │
+             ┌─────────────────────┤ VCC (5V) ◄───────┬─┤
+             │                     │                   │ │
+             │  ┌──────────────────┤                 GND│ │
+             │  │                  │                   │ │
+         GND ┴──┴─ COM (common) ────┼──────────────────┤ │
+        (pi) │  │                  │    ┌─ NO (N.O.) ──┼─┤
+             │  │                  │    │              │ │
+             │  │                  │    └──────────────┼─┘
              │  │                  │                   │
-             │  │  ┌─ 1-3 (NO) ────┼──────────────────┤
-         GND ┴──┴─ 1-2 (COM)────────┼─┐                └─ GND (relay board)
-                                      │                
-                                      └──► Pump 1 Power Circuit
-                                          (+12V to pump, -12V return)
-
-Pump 2 Circuit:
-─────────────
-GPIO 27 ──────────────────────────────► IN2
-                                   
-             ┌────────────────────►│─ GND
-             │  ┌─────────────────►│─ VCC (5V)
-             │  │  ┌─ 2-3 (NO) ────┼──────────────────┐
-        GND ┴──┴─ 2-2 (COM)────────┼─┐                │
-                                     │        (12V pump circuit)
-                                     └──► Pump 2 Power Circuit
-                                         (+12V to pump, -12V return)
+             │  └──────────────────► GND (relay board) │
+             │                                         │
+             └─ +12V from pump supply ────────────────┘
+                (pump receives 12V when relay activated)
+```
 ```
 
 **Step-by-Step Wiring Instructions:**
@@ -309,10 +300,9 @@ Pi +5V* (pin 2 or 4) → Relay VCC (control section)
 ```
 *If Pi 5V available; otherwise use separate USB power for relay logic VCC
 
-**2. GPIO Inputs to Relay**
+**2. GPIO Input to Relay**
 ```
-Pi GPIO 17 (pump 1)  → Relay IN1
-Pi GPIO 27 (pump 2)  → Relay IN2
+Pi GPIO 17 (pump)  → Relay IN
 ```
 
 **3. Relay Coil Power (12V Supply)**
@@ -321,21 +311,13 @@ Pi GPIO 27 (pump 2)  → Relay IN2
 GND (from DC adapter)  → Relay GND (shared with control)
 ```
 
-**4. Pump 1 Connected to Relay Ch1**
+**4. Pump Connected to Relay**
 ```
-Pump 1 +12V → Relay 1-3 (NO - normally open)
-Pump 1 -12V → Relay 1-2 (COM - common)
+Pump +12V → Relay NO (normally open)
+Pump -12V → Relay COM (common)
 ```
 When GPIO 17 = HIGH: Relay closes, pump runs
 When GPIO 17 = LOW:  Relay opens, pump stops
-
-**5. Pump 2 Connected to Relay Ch2**
-```
-Pump 2 +12V → Relay 2-3 (NO - normally open)
-Pump 2 -12V → Relay 2-2 (COM - common)
-```
-When GPIO 27 = HIGH: Relay closes, pump runs
-When GPIO 27 = LOW:  Relay opens, pump stops
 
 **Ground Connections (Critical!) — BEGINNER GUIDE:**
 
@@ -396,8 +378,7 @@ Without proper ground connection:
 - ❌ You'll waste hours debugging and think your relay is broken!
 
 **WITH proper ground connection:**
-- ✅ GPIO 17 HIGH → Relay hears it → Relay turns on → Pump 1 runs
-- ✅ GPIO 27 HIGH → Relay hears it → Relay turns on → Pump 2 runs
+- ✅ GPIO 17 HIGH → Relay hears it → Relay turns on → Pump runs
 - ✅ Everything works!
 
 **Checklist Before Plugging In:**
@@ -459,13 +440,13 @@ Contact your relay module supplier for a diagram, then:
 - Leave GND connections floating
 
 **✅ Safe Wiring Checklist:**
-- [ ] JD-VCC has jumper (or connected to 12V supply, NOT Pi 5V)
+- [ ] VCC powered by 5V (from Pi or separate USB power)
 - [ ] All GND connections are common (Pi, relay, 12V supply)
-- [ ] GPIO pins 17 and 27 connected to IN1 and IN2
-- [ ] Pump wiring uses NO (1-3, 2-3) and COM (1-2, 2-2) contacts
+- [ ] GPIO 17 connected to IN (control signal)
+- [ ] Pump wiring uses NO (normally open) and COM (common) contacts
 - [ ] 12V supply is isolated from Pi power
 - [ ] Relay cooling slots are not blocked
-- [ ] TEST with `gpio readall` before attaching pumps
+- [ ] TEST with `gpio write 17 1` to verify relay clicks before attaching pump
 
 ```
 
