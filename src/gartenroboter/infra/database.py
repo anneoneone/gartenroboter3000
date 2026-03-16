@@ -21,7 +21,7 @@ SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS sensor_readings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     timestamp TEXT NOT NULL,
-    sensor_type TEXT NOT NULL,  -- 'soil_moisture', 'water_level', 'pi_temperature'
+    sensor_type TEXT NOT NULL,  -- 'soil_moisture', 'water_level', 'pi_temperature', 'bmp280_temperature', 'bmp280_pressure'
     zone_id INTEGER,  -- NULL for non-zone sensors
     raw_value INTEGER,
     normalized_value REAL,

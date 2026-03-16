@@ -104,6 +104,24 @@ class SensorSettings(BaseSettings):
         le=85,
         description="Pi temperature warning threshold (Celsius)",
     )
+    bmp280_temp_warning: int = Field(
+        default=35,
+        ge=10,
+        le=60,
+        description="BMP280 temperature warning threshold (Celsius)",
+    )
+    bmp280_i2c_address: int = Field(
+        default=0x77,
+        ge=0,
+        le=0x7F,
+        description="BMP280 I2C address (0x76 or 0x77)",
+    )
+    bmp280_sea_level_pressure_hpa: float | None = Field(
+        default=None,
+        ge=900.0,
+        le=1100.0,
+        description="Sea level pressure (hPa) for altitude calculation (None to disable)",
+    )
     # Calibration values per sensor (min/max raw ADC values)
     calibration: dict[str, dict[str, int]] = Field(
         default_factory=lambda: {

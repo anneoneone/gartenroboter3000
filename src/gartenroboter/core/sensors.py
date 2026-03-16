@@ -48,6 +48,24 @@ class TemperatureReading:
     timestamp: datetime
 
 
+@dataclass
+class BMP280TemperatureReading:
+    """BMP280 temperature reading."""
+
+    temperature_celsius: float
+    is_warning: bool
+    timestamp: datetime
+
+
+@dataclass
+class BMP280PressureReading:
+    """BMP280 air pressure reading."""
+
+    pressure_hpa: float
+    altitude_m: float | None
+    timestamp: datetime
+
+
 class SoilMoistureSensor:
     """Reads soil moisture from capacitive sensors via ADC."""
 
@@ -206,6 +224,128 @@ class PiTemperatureSensor:
             return 0.0
 
 
+class BMP280Sensor:
+    """Reads temperature and pressure from GY BMP280 sensor via I2C."""
+
+    def __init__(self, settings: SensorSettings) -> None:
+        self.settings = settings
+        self._sensor = None
+        self._i2c = None
+        self._is_available = False
+
+        self._init_sensor()
+
+    def _init_sensor(self) -> None:
+        """Initialize I2C and BMP280 sensor."""
+        try:
+            import board
+            import busio
+            from adafruit_bmp280 import Adafruit_BMP280_I2C
+
+            # Initialize I2C
+            i2c = busio.I2C(board.SCL, board.SDA)
+            
+            # Get I2C address from settings (default 0x77)
+            i2c_address = getattr(self.settings, 'bmp280_i2c_address', 0x77)
+            
+            # Initialize BMP280 sensor
+            self._sensor = Adafruit_BMP280_I2C(i2c, address=i2c_address)
+            self._i2c = i2c
+            self._is_available = True
+            
+            logger.info("BMP280 sensor initialized at address 0x%02x", i2c_address)
+        except ImportError:
+            logger.warning(
+                "adafruit-circuitpython-bmp280 not installed. "
+                "Install with: pip install adafruit-circuitpython-bmp280"
+            )
+            self._is_available = False
+        except Exception as e:
+            logger.error("BMP280 initialization failed: %s", e)
+            self._is_available = False
+
+    async def read_temperature(self) -> BMP280TemperatureReading:
+        """Read temperature from BMP280."""
+        if not self._is_available or self._sensor is None:
+            # Return mock data for development
+            temp = 22.0 + (hash(datetime.now().second) % 5)
+            is_warning = temp >= self.settings.bmp280_temp_warning
+            return BMP280TemperatureReading(
+                temperature_celsius=round(temp, 1),
+                is_warning=is_warning,
+                timestamp=datetime.now(UTC),
+            )
+
+        try:
+            temp = self._sensor.temperature
+            is_warning = temp >= self.settings.bmp280_temp_warning
+            
+            return BMP280TemperatureReading(
+                temperature_celsius=round(temp, 1),
+                is_warning=is_warning,
+                timestamp=datetime.now(UTC),
+            )
+        except Exception as e:
+            logger.error("Failed to read BMP280 temperature: %s", e)
+            # Return mock data on error
+            return BMP280TemperatureReading(
+                temperature_celsius=0.0,
+                is_warning=False,
+                timestamp=datetime.now(UTC),
+            )
+
+    async def read_pressure(self) -> BMP280PressureReading:
+        """Read pressure and altitude from BMP280."""
+        if not self._is_available or self._sensor is None:
+            # Return mock data for development
+            pressure = 1013.0 + (hash(datetime.now().second) % 20)
+            return BMP280PressureReading(
+                pressure_hpa=round(pressure, 1),
+                altitude_m=None,
+                timestamp=datetime.now(UTC),
+            )
+
+        try:
+            pressure = self._sensor.pressure
+            
+            # Calculate altitude if sea level pressure is configured
+            altitude = None
+            sea_level_pressure = getattr(
+                self.settings, 'bmp280_sea_level_pressure_hpa', None
+            )
+            if sea_level_pressure:
+                # Barometric formula: h = 44330 * (1 - (P/P0)^(1/5.255))
+                altitude = 44330 * (
+                    1.0 - pow(pressure / sea_level_pressure, 1.0 / 5.255)
+                )
+            
+            return BMP280PressureReading(
+                pressure_hpa=round(pressure, 1),
+                altitude_m=round(altitude, 1) if altitude else None,
+                timestamp=datetime.now(UTC),
+            )
+        except Exception as e:
+            logger.error("Failed to read BMP280 pressure: %s", e)
+            # Return mock data on error
+            return BMP280PressureReading(
+                pressure_hpa=0.0,
+                altitude_m=None,
+                timestamp=datetime.now(UTC),
+            )
+
+    async def cleanup(self) -> None:
+        """Clean up I2C resources."""
+        try:
+            if self._i2c:
+                self._i2c.deinit()
+                self._i2c = None
+                self._sensor = None
+                self._is_available = False
+                logger.info("BMP280 sensor cleaned up")
+        except Exception as e:
+            logger.error("BMP280 cleanup error: %s", e)
+
+
 class SensorManager:
     """Manages all sensors and provides consolidated readings."""
 
@@ -232,6 +372,9 @@ class SensorManager:
         # Initialize Pi temperature sensor
         self.temp_sensor = PiTemperatureSensor(settings)
 
+        # Initialize BMP280 environmental sensor (optional)
+        self.bmp280_sensor = BMP280Sensor(settings)
+
     async def read_all_soil_moisture(self) -> list[SoilMoistureReading]:
         """Read all soil moisture sensors concurrently."""
         tasks = [sensor.read() for sensor in self.soil_sensors]
@@ -245,13 +388,25 @@ class SensorManager:
         """Read Pi temperature."""
         return await self.temp_sensor.read()
 
+    async def read_bmp280_temperature(self) -> BMP280TemperatureReading:
+        """Read BMP280 temperature."""
+        return await self.bmp280_sensor.read_temperature()
+
+    async def read_bmp280_pressure(self) -> BMP280PressureReading:
+        """Read BMP280 pressure and altitude."""
+        return await self.bmp280_sensor.read_pressure()
+
     async def read_all(
         self,
-    ) -> tuple[list[SoilMoistureReading], WaterLevelReading, TemperatureReading]:
+    ) -> tuple[list[SoilMoistureReading], WaterLevelReading, TemperatureReading, BMP280TemperatureReading, BMP280PressureReading]:
         """Read all sensors concurrently."""
         soil_task = self.read_all_soil_moisture()
         water_task = self.read_water_level()
         temp_task = self.read_pi_temperature()
+        bmp280_temp_task = self.read_bmp280_temperature()
+        bmp280_pressure_task = self.read_bmp280_pressure()
 
-        soil, water, temp = await asyncio.gather(soil_task, water_task, temp_task)
-        return soil, water, temp
+        soil, water, temp, bmp280_temp, bmp280_pressure = await asyncio.gather(
+            soil_task, water_task, temp_task, bmp280_temp_task, bmp280_pressure_task
+        )
+        return soil, water, temp, bmp280_temp, bmp280_pressure

@@ -77,6 +77,7 @@ RPi 4 offers significant advantages over Pi Zero 2 W:
 | ADC Converter | MCP3008 (8-channel, 10-bit SPI) | 1 | Required for soil moisture sensors |
 | Soil Moisture Sensor | Capacitive (not resistive!) | 4 | Resistive sensors corrode quickly |
 | Water Level Sensor | HC-SR04 (ultrasonic) | 1 | Requires voltage divider (5V → 3.3V) on echo pin |
+| Environmental Sensor | GY BMP280 (I2C) | 1 | Optional; measures temperature & air pressure |
 | Relay Module | 5V 1-channel with optocoupler | 1-2 | 1 for single pump, 2 for parallel dual-pump setup |
 | Water Pump | 12V DC submersible | 1-2 | 2-5W typical; 2 pumps allow simultaneous watering |
 | Pump Power Supply | 12V ≥2A DC adapter | 1 | Separate from Pi power (no shared ground until relay) |
@@ -100,8 +101,8 @@ RPi 4 offers significant advantages over Pi Zero 2 W:
 Raspberry Pi GPIO Pinout:
 ┌─────────────────────────────────────┐
 │  3V3 (1) (2) 5V                     │
-│  SDA (3) (4) 5V ──────► HC-SR04 VCC │
-│  SCL (5) (6) GND ─────► HC-SR04 GND │
+│  SDA (3) ◄─► BMP280 SDA             │
+│  SCL (5) ◄─► BMP280 SCL             │
 │  GP4 (7) (8) TX                     │
 │  GND (9) (10) RX                    │
 │ GP17 (11) ─────────────► Pump Relay │
@@ -114,6 +115,12 @@ Raspberry Pi GPIO Pinout:
 │ MOSI (19) ─────────────► MCP3008 DIN│
 │ MISO (21) ◄────────────── MCP3008 DOUT
 │ SCLK (23) ─────────────► MCP3008 CLK│
+│                                     │
+│ BMP280 (I2C):                       │
+│  3V3 ──────────────────► VCC        │
+│  GND ──────────────────► GND        │
+│  SDA (GPIO 2, pin 3) ──► SDA        │
+│  SCL (GPIO 3, pin 5) ──► SCL        │
 └─────────────────────────────────────┘
 
 MCP3008 ADC Channels:
@@ -193,8 +200,8 @@ Voltage Divider for HC-SR04 Echo (5V → 3.3V):
 Raspberry Pi GPIO Pinout (with 2nd pump):
 ┌──────────────────────────────────────┐
 │  3V3 (1) (2) 5V                      │
-│  SDA (3) (4) 5V ──────► HC-SR04 VCC  │
-│  SCL (5) (6) GND ─────► HC-SR04 GND  │
+│  SDA (3) ◄─► BMP280 SDA              │
+│  SCL (5) ◄─► BMP280 SCL              │
 │  GP4 (7) (8) TX                      │
 │  GND (9) (10) RX                     │
 │ GP17 (11) ────────────► Pump 1 Relay │
@@ -207,6 +214,12 @@ Raspberry Pi GPIO Pinout (with 2nd pump):
 │ MOSI (19) ────────────► MCP3008 DIN  │
 │ MISO (21) ◄───────────── MCP3008 DOUT
 │ SCLK (23) ────────────► MCP3008 CLK  │
+│                                      │
+│ BMP280 (I2C):                        │
+│  3V3 ──────────────────► VCC         │
+│  GND ──────────────────► GND         │
+│  SDA (GPIO 2, pin 3) ──► SDA         │
+│  SCL (GPIO 3, pin 5) ──► SCL         │
 └──────────────────────────────────────┘
 
 Zone-to-Pump Mapping (with dual pumps):
@@ -220,6 +233,60 @@ MCP3008 ADC Channels: (same as single pump)
   CH1 ◄── Soil Sensor Zone 2
   CH2 ◄── Soil Sensor Zone 3
   CH3 ◄── Soil Sensor Zone 4
+```
+
+### GY BMP280 Sensor Wiring (Optional - I2C Temperature & Pressure)
+
+The BMP280 measures temperature and atmospheric pressure via I2C. It's optional but useful for weather monitoring and forecasting.
+
+**BMP280 Pinout (standard GY-BMP280 board):**
+```
+GY-BMP280 Breakout:
+  1. VCC   → Raspberry Pi 3.3V (pin 1 or 17)
+  2. GND   → Raspberry Pi GND (any GND pin)
+  3. SCL   → Raspberry Pi GPIO 3 (SCL pin 5)
+  4. SDA   → Raspberry Pi GPIO 2 (SDA pin 3)
+  5. CSB   → Optional (pull-high for SPI, usually not connected)
+  6. SDO   → Optional (determines I2C address, ground for 0x76, 3.3V for 0x77)
+```
+
+**Simple I2C Wiring Diagram:**
+```
+Raspberry Pi                           GY-BMP280 Module
+─────────────                          ────────────────
+
+3.3V (pin 1) ──────────────────────► VCC (1)
+                        
+GND (pin 6, 9, 14, etc.) ───────────► GND (2)
+
+GPIO 3 / SDA (pin 3) ───────────────► SDA (4)
+
+GPIO 2 / SCL (pin 5) ───────────────► SCL (3)
+
+(Optional: 3.3V) ────────────────────► SDO (6) - set address to 0x77
+(Optional: GND) ─────────────────────► SDO (6) - set address to 0x76
+```
+
+**I2C Address Configuration:**
+- **SDO pin connected to GND** → I2C Address = **0x76** (118 in decimal)
+- **SDO pin connected to 3.3V** → I2C Address = **0x77** (119 in decimal) — Most common
+- **SDO pin floating** → Address defaults to 0x77
+
+In `.env` configuration, use:
+```dotenv
+SENSOR_BMP280_I2C_ADDRESS=119  # For 0x77 (most common)
+SENSOR_BMP280_I2C_ADDRESS=118  # For 0x76 (if SDO is grounded)
+```
+
+**Reading Values:**
+- **Temperature**: Used for environmental monitoring and plant stress detection
+- **Air Pressure**: Useful for weather prediction (falling pressure = rain likely)
+- **Calculated Altitude**: Requires sea level pressure calibration
+
+Verify sensor is detected:
+```bash
+i2cdetect -y 1
+# Should show your address (76 or 77) in the grid
 ```
 
 ### 2-Channel Relay Module Wiring (10A 1U Relay Board)
