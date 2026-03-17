@@ -2,7 +2,7 @@
 
 **Optimized for Raspberry Pi 4 Model B** — Garden automation system with intelligent watering control, soil monitoring, and Telegram integration.
 
-**📖 Contents:** [Quick Start](#-quick-start) · [Features](#features) · [Hardware](#hardware-requirements) · [Installation](#installation-raspberry-pi-4) · [Configuration](#configuration) · [Telegram Bot](#telegram-bot-commands) · [RPi 4 Optimization](#-raspberry-pi-4-model-b-optimization) · [Troubleshooting](#troubleshooting) · [Development](#development)
+**📖 Contents:** [Quick Start](#-quick-start) · [Features](#features) · [Hardware](#hardware-requirements) · [Installation](#installation-raspberry-pi-4) · [Configuration](#configuration) · [InfluxDB Setup](#influxdb-time-series-database-optional) · [Telegram Bot](#telegram-bot-commands) · [RPi 4 Optimization](#-raspberry-pi-4-model-b-optimization) · [Troubleshooting](#troubleshooting) · [Development](#development)
 
 ## ⚡ Quick Start (Raspberry Pi 4)
 
@@ -42,10 +42,11 @@ journalctl -u gartenroboter -n 20 -f
 - **4x Soil Moisture Monitoring** — Capacitive sensors for each garden zone
 - **Smart Watering** — Only waters after sunset when soil is dry
 - **Rain Barrel Monitoring** — Ultrasonic water level sensing with low-level alerts
+- **Environmental Monitoring** — BMP280 temperature and air pressure sensor (I2C)
 - **Telegram Bot Control** — Configure and monitor via Telegram
 - **Weather Integration** — OpenWeather API for sunset times and conditions
 - **Pi Health Monitoring** — Temperature warnings to prevent overheating
-- **Data Logging** — SQLite database with 90-day retention
+- **Data Logging** — SQLite database with 180-day retention + optional InfluxDB for time-series metrics
 
 ## 🎯 Raspberry Pi 4 Model B Optimization
 
@@ -619,6 +620,61 @@ See `.env.example` for all options and defaults.
 | `PUMP_COOLDOWN` | `300` | Cooldown between cycles (seconds) |
 
 See [.env.example](.env.example) for all configuration options.
+
+## InfluxDB — Time-Series Database (Optional)
+
+Gartenroboter3000 can log all sensor measurements to InfluxDB, a time-series database optimized for metrics analytics.
+
+### What Gets Logged to InfluxDB?
+
+- **Soil Humidity** — Moisture % per zone (4 zones)
+- **Watertank Level** — Water level percentage
+- **Air Temperature** — BMP280 sensor readings (°C)
+- **Air Pressure** — BMP280 sensor readings (hPa)
+- **Raspberry Pi Temperature** — System temperature (°C)
+- **Pump Runtime** — Duration of each watering event (seconds)
+
+### Why Use InfluxDB?
+
+| Feature | SQLite Only | SQLite + InfluxDB |
+|---------|---|---|
+| **Basic data storage** | ✅ | ✅ ✅ |
+| **180-day retention** | ✅ | ✅ ✅ |
+| **Time-series optimization** | ⚠️ Limited | ✅ Optimized |
+| **Real-time trend analysis** | ⚠️ Slow queries | ✅ Fast |
+| **Grafana dashboards** | ❌ Limited | ✅ Full support |
+| **High-frequency metrics** | ⚠️ Can be slow | ✅ Built for this |
+| **Storage efficiency** | Standard | 30-50% more space |
+
+### Quick Setup
+
+1. **Install InfluxDB on your Raspberry Pi:**
+   ```bash
+   # See full guide at: docs/INFLUXDB_SETUP.md
+   sudo apt update && sudo apt install influxdb2
+   ```
+
+2. **Configure in `.env`:**
+   ```dotenv
+   INFLUXDB_ENABLED=true
+   INFLUXDB_URL=http://localhost:8086
+   INFLUXDB_TOKEN=<your-api-token>
+   INFLUXDB_ORG=gartenroboter
+   INFLUXDB_BUCKET=garden_metrics
+   ```
+
+3. **Restart Gartenroboter:**
+   ```bash
+   sudo systemctl restart gartenroboter
+   ```
+
+4. **Visualize with Grafana (optional):**
+   ```bash
+   sudo apt install grafana-server
+   # Access at http://<pi-ip>:3000
+   ```
+
+**For detailed setup instructions, see [docs/INFLUXDB_SETUP.md](docs/INFLUXDB_SETUP.md)**
 
 ## Telegram Bot Commands
 

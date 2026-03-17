@@ -267,6 +267,44 @@ class SystemSettings(BaseSettings):
     )
 
 
+class InfluxDBSettings(BaseSettings):
+    """InfluxDB configuration."""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        env_prefix="INFLUXDB_",
+        extra="ignore",
+    )
+
+    enabled: bool = Field(
+        default=False,
+        description="Enable InfluxDB data logging",
+    )
+    url: str = Field(
+        default="http://localhost:8086",
+        description="InfluxDB URL (e.g., http://localhost:8086)",
+    )
+    token: str = Field(
+        default="",
+        description="InfluxDB API token",
+    )
+    org: str = Field(
+        default="gartenroboter",
+        description="InfluxDB organization name",
+    )
+    bucket: str = Field(
+        default="garden_metrics",
+        description="InfluxDB bucket name for sensor data",
+    )
+    timeout_seconds: int = Field(
+        default=10,
+        ge=1,
+        le=60,
+        description="InfluxDB write timeout in seconds",
+    )
+
+
 class Settings(BaseSettings):
     """Main application settings."""
 
@@ -287,6 +325,7 @@ class Settings(BaseSettings):
     database: DatabaseSettings = Field(default_factory=DatabaseSettings)
     scheduler: SchedulerSettings = Field(default_factory=SchedulerSettings)
     system: SystemSettings = Field(default_factory=SystemSettings)
+    influxdb: InfluxDBSettings = Field(default_factory=InfluxDBSettings)
 
     # Runtime settings
     mock_mode: bool = Field(

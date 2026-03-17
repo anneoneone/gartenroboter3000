@@ -14,6 +14,7 @@ from gartenroboter.core.sensors import SensorManager
 from gartenroboter.core.watering import WateringEngine
 from gartenroboter.infra.database import Database
 from gartenroboter.infra.gpio import GpioInterface, create_gpio
+from gartenroboter.infra.influxdb import InfluxDBWriter
 from gartenroboter.infra.scheduler import Scheduler, create_default_scheduler
 from gartenroboter.services.sun import SunTracker
 from gartenroboter.services.telegram import TelegramBot, TelegramNotifier
@@ -41,6 +42,7 @@ class Container:
     notifier: TelegramNotifier
     telegram_bot: TelegramBot
     scheduler: Scheduler
+    influxdb: InfluxDBWriter
 
     # Internal state
     _shutdown_event: asyncio.Event = field(default_factory=asyncio.Event)
@@ -140,11 +142,15 @@ async def create_app(
         config_manager=config_manager,
     )
 
+    # Create InfluxDB writer
+    influxdb = InfluxDBWriter(settings=settings.influxdb)
+
     # Create scheduler with callbacks
     async def sensor_callback() -> None:
-        """Read all sensors and log to database."""
+        """Read all sensors and log to database and InfluxDB."""
         try:
-            soil_readings, water_level, pi_temp = await sensors.read_all()
+            soil_readings, water_level, pi_temp, bmp280_temp, bmp280_pressure = await sensors.read_all()
+            
             # Log each soil moisture reading
             for reading in soil_readings:
                 await database.insert_sensor_reading(
@@ -154,6 +160,7 @@ async def create_app(
                     normalized_value=reading.moisture_percent,
                     is_warning=reading.is_dry,
                 )
+            
             # Log water level
             await database.insert_sensor_reading(
                 sensor_type="water_level",
@@ -161,12 +168,38 @@ async def create_app(
                 normalized_value=water_level.level_percent,
                 is_warning=water_level.is_low,
             )
+            
             # Log Pi temperature
             await database.insert_sensor_reading(
                 sensor_type="pi_temperature",
                 raw_value=None,
                 normalized_value=pi_temp.temperature_celsius,
                 is_warning=pi_temp.is_warning,
+            )
+            
+            # Log BMP280 temperature
+            await database.insert_sensor_reading(
+                sensor_type="bmp280_temperature",
+                raw_value=None,
+                normalized_value=bmp280_temp.temperature_celsius,
+                is_warning=bmp280_temp.is_warning,
+            )
+            
+            # Log BMP280 pressure
+            await database.insert_sensor_reading(
+                sensor_type="bmp280_pressure",
+                raw_value=None,
+                normalized_value=bmp280_pressure.pressure_hpa,
+                is_warning=False,
+            )
+            
+            # Write metrics to InfluxDB
+            await influxdb.write_sensor_metrics(
+                soil_readings=soil_readings,
+                water_level=water_level.level_percent,
+                pi_temperature=pi_temp.temperature_celsius,
+                bmp280_temp=bmp280_temp.temperature_celsius,
+                bmp280_pressure=bmp280_pressure.pressure_hpa,
             )
         except Exception as e:
             logger.error(f"Sensor polling failed: {e}")
@@ -239,6 +272,7 @@ async def create_app(
         notifier=notifier,
         telegram_bot=telegram_bot,
         scheduler=scheduler,
+        influxdb=influxdb,
     )
 
     logger.info("Application created successfully")
@@ -297,6 +331,7 @@ async def run_app(container: Container) -> None:
         # Cleanup
         await container.pump.emergency_stop()
         await container.database.close()
+        await container.influxdb.close()
         await container.gpio.cleanup()
 
         logger.info("Application shutdown complete")

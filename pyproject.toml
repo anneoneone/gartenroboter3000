@@ -26,6 +26,7 @@ dependencies = [
     "pydantic-settings>=2.0,<3.0",
     "python-telegram-bot>=21.0,<22.0",
     "astral>=3.2,<4.0",
+    "influxdb-client>=1.18,<2.0",
 ]
 
 [project.optional-dependencies]
