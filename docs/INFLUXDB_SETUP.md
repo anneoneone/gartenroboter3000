@@ -36,12 +36,45 @@ InfluxDB is an open-source time-series database optimized for storing and queryi
 
 **Raspberry Pi 4 Specifications:**
 - 2GB RAM minimum (4GB+ recommended for InfluxDB + Gartenroboter)
-- 32GB microSD card or larger
-- Storage requirement: ~100-200MB for InfluxDB binary + data (~50MB for 30 days of sensor data)
+- 32GB microSD card minimum (see [Storage Calculation](#storage-calculation) below)
+- Network: Local access (InfluxDB listens on port 8086 by default)
 
-**Network:**
-- Local network access (InfluxDB listens on port 8086 by default)
-- No internet required (InfluxDB is self-contained)
+### Storage Calculation
+
+**How much does sensor data consume?**
+
+Your Gartenroboter3000 records these metrics **every 15 seconds:**
+- 4× soil humidity sensors (zones 1-4)
+- 1× water level sensor
+- 1× Pi temperature
+- 1× BMP280 air temperature
+- 1× BMP280 air pressure
+- Pump runtime events (~1-2 per day)
+
+**InfluxDB Efficiency:** ~80-100 bytes per metric point (highly compressed)
+
+| Timeframe | Data Points | Storage | Total with Overhead |
+|-----------|------------|---------|-------------------|
+| 30 days | 1.56M points | 150 MB | ~180 MB |
+| 90 days | 4.68M points | 450 MB | ~540 MB |
+| 180 days | 9.36M points | 900 MB | ~1.1 GB |
+| **1 year** | **18.7M points** | **1.8 GB** | **~2.2 GB** |
+| 2 years | 37.4M points | 3.6 GB | ~4.4 GB |
+
+**Plus SQLite database (180-day retention):** +200 MB
+
+**Raspberry Pi OS (Lite 64-bit):** 2-3 GB
+**System files, logs, backups:** 1-2 GB
+
+### Recommended microSD Sizes
+
+| Card Size | InfluxDB Duration | Use Case |
+|-----------|-----------------|----------|
+| **32 GB** | 1.5+ years | 🟢 **Minimum recommended** — Good for most gardens |
+| **64 GB** | 3.5+ years | 🟢 **Recommended** — Comfortable margin for long-term analysis |
+| **128 GB** | 7+ years | 🟡 **Optional** — Only needed if archiving multiple seasons |
+
+**Bottom line:** **32GB is sufficient for most use cases.** This gives you 1.5+ years of continuous recording before needing data cleanup.
 
 ---
 
@@ -457,9 +490,89 @@ Check database size:
 ```bash
 du -sh /var/lib/influxdb
 
-# If > 500MB, consider deleting old data
-# In InfluxDB UI: Data → Buckets → Edit → Set retention policy
+# Check overall Pi disk usage
+df -h /var/lib/influxdb
 ```
+
+**If approaching capacity (>25GB used on 32GB card):**
+
+**Option 1: Set Automatic Data Retention (Recommended)**
+
+In InfluxDB UI:
+1. Click **Data** (left sidebar)
+2. Click **Buckets**
+3. Click **garden_metrics** → **Edit**
+4. Set **Retention** to desired time period:
+   - 30 days: ~540 MB
+   - 90 days: ~1.1 GB
+   - 180 days: ~2.2 GB
+   - 1 year: ~4.4 GB
+5. Click **Save**
+
+Data older than the retention period is automatically deleted.
+
+**Option 2: Manually Delete Old Data (Advanced)**
+
+```bash
+# Connect to InfluxDB CLI
+influx --host http://localhost:8086 \
+       --token <your-api-token> \
+       --org gartenroboter
+
+# Delete data older than 90 days
+bucket delete --name garden_metrics_old
+```
+
+**Option 3: Reduce Sensor Polling Frequency**
+
+Less frequent readings = less storage needed:
+
+```bash
+# In .env, change sensor interval
+SCHEDULER_SENSOR_INTERVAL=30  # Was 15, now 30 seconds = 50% less data
+```
+
+New storage consumption:
+- 30 days: ~270 MB (instead of 540 MB)
+- 1 year: ~3.3 GB (instead of 4.4 GB)
+
+---
+
+## Disk Space Management Strategy
+
+**For 32GB microSD (recommended setup):**
+
+```
+Install → 2.5 GB (OS + system)
+Reserve → 2.5 GB (safety margin)
+Available → 27 GB
+├─ SQLite 180-day: 200 MB
+└─ InfluxDB: 26.8 GB
+   └─ At 15s interval: 1.5+ years of history
+```
+
+**Check disk usage regularly:**
+
+```bash
+# Create a simple monitor script
+cat > ~/check-disk.sh << 'EOF'
+#!/bin/bash
+USAGE=$(df / | awk 'NR==2 {print int($3/$2 * 100)}')
+INFLUX=$(du -sb /var/lib/influxdb | awk '{print $1}')
+
+echo "Disk usage: $USAGE%"
+echo "InfluxDB size: $(numfmt --to=iec $INFLUX 2>/dev/null || echo $((INFLUX/1024/1024))MB)"
+
+if [ $USAGE -gt 90 ]; then
+  echo "⚠️ WARNING: Disk > 90% full!"
+fi
+EOF
+
+chmod +x ~/check-disk.sh
+./check-disk.sh
+```
+
+---
 
 ### High Memory Usage on Pi
 
