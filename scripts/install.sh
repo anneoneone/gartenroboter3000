@@ -12,7 +12,8 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-INSTALL_DIR="/home/pi/gartenroboter3000"
+CURRENT_USER="$(whoami)"
+INSTALL_DIR="$HOME/gartenroboter3000"
 SERVICE_NAME="gartenroboter"
 PYTHON_VERSION="3.11"
 PI_MODEL=""
@@ -22,10 +23,12 @@ echo "╔═══════════════════════�
 echo "║  Gartenroboter3000 Installation Script (Raspberry Pi 4)       ║"
 echo "╚═══════════════════════════════════════════════════════════════╝"
 echo -e "${NC}"
+echo -e "${BLUE}ℹ️  Installing for user: $CURRENT_USER${NC}"
+echo -e "${BLUE}ℹ️  Installation directory: $INSTALL_DIR${NC}"
 
 # Check if running as root
 if [ "$EUID" -eq 0 ]; then
-    echo -e "${RED}❌ Please do not run as root. Run as the 'pi' user.${NC}"
+    echo -e "${RED}❌ Please do not run as root. Run as a regular user (not root).${NC}"
     exit 1
 fi
 
@@ -107,7 +110,9 @@ if ! grep -q "^dtparam=i2c_arm=on" /boot/config.txt; then
 fi
 
 # Add user to required groups
-sudo usermod -aG gpio,spi,i2c pi
+echo -e "${BLUE}ℹ️  Adding $CURRENT_USER to GPIO/SPI/I2C groups...${NC}"
+sudo usermod -aG gpio,spi,i2c "$CURRENT_USER"
+echo -e "${YELLOW}⚠️  You may need to log out and back in for group changes to take effect${NC}"
 
 echo -e "\n${GREEN}[4/7] Installing uv (Python package manager)...${NC}"
 if ! command -v uv &> /dev/null; then
