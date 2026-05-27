@@ -6,16 +6,16 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=pi
-Group=pi
-WorkingDirectory=/home/pi/gartenroboter3000
+User=%USERNAME%
+Group=%USERNAME%
+WorkingDirectory=%USERHOME%/gartenroboter3000
 
 # Environment
-Environment="PATH=/home/pi/.local/bin:/usr/local/bin:/usr/bin:/bin"
-EnvironmentFile=-/home/pi/gartenroboter3000/.env
+Environment="PATH=%USERHOME%/.local/bin:/usr/local/bin:/usr/bin:/bin"
+EnvironmentFile=-%USERHOME%/gartenroboter3000/.env
 
 # Start command
-ExecStart=/home/pi/.local/bin/uv run gartenroboter
+ExecStart=%USERHOME%/.local/bin/uv run gartenroboter
 
 # Restart policy
 Restart=on-failure
@@ -44,7 +44,7 @@ OOMPolicy=kill
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=/home/pi/gartenroboter3000/data /home/pi/gartenroboter3000/logs
+ReadWritePaths=%USERHOME%/gartenroboter3000/data %USERHOME%/gartenroboter3000/logs
 PrivateTmp=true
 
 # GPIO access

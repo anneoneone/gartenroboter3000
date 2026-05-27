@@ -456,7 +456,6 @@ Contact your relay module supplier for a diagram, then:
 ### Step-by-Step Setup
 
 **1. Initial Pi Setup (via Raspberry Pi Imager)**
-```bash
 # Flash 32GB microSD with:
 # - OS: Raspberry Pi OS Lite (64-bit recommended)
 # - Hostname: gartenroboter

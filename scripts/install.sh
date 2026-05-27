@@ -151,8 +151,12 @@ uv sync --python 3.11
 
 echo -e "\n${GREEN}[7/7] Setting up systemd service...${NC}"
 
-# Copy service file
-sudo cp "$INSTALL_DIR/systemd/gartenroboter.service" /etc/systemd/system/
+# Copy service file with user substitution
+echo -e "${BLUE}ℹ️  Setting up systemd service for user: $CURRENT_USER${NC}"
+sudo sed \
+  -e "s|%USERNAME%|$CURRENT_USER|g" \
+  -e "s|%USERHOME%|$HOME|g" \
+  "$INSTALL_DIR/systemd/gartenroboter.service" | sudo tee /etc/systemd/system/gartenroboter.service > /dev/null
 
 # Create environment file if it doesn't exist
 if [ ! -f "$INSTALL_DIR/.env" ]; then
