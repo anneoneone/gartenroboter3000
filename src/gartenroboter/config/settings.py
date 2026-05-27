@@ -199,8 +199,10 @@ class GpioSettings(BaseSettings):
     @field_validator("soil_sensor_channels", mode="before")
     @classmethod
     def parse_channels(cls, v: Any) -> list[int]:
-        """Parse comma-separated channels from env."""
+        """Parse comma-separated channels from env, stripping comments."""
         if isinstance(v, str):
+            # Strip comments first
+            v = v.split("#")[0].strip()
             return [int(x.strip()) for x in v.split(",") if x.strip()]
         if isinstance(v, list):
             return [int(x) for x in v]
