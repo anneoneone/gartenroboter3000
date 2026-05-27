@@ -29,8 +29,8 @@ StandardError=journal
 SyslogIdentifier=gartenroboter
 
 # ===== Raspberry Pi 4 Resource Configuration =====
-# 512MB RAM, so cap memory to stay under 256MB
-MemoryLimit=256M
+# Cap memory for stability (256MB limit for tight resource conditions)
+MemoryMax=256M
 MemoryAccounting=yes
 
 # Limit CPU to prevent fork bombs (2 cores, use ~1.5)
