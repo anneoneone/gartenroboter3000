@@ -12,6 +12,8 @@ WorkingDirectory=%USERHOME%/gartenroboter3000
 
 # Environment
 Environment="PATH=%USERHOME%/.local/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="TMPDIR=/tmp"
+Environment="UV_CACHE_DIR=/tmp/uv-cache"
 EnvironmentFile=-%USERHOME%/gartenroboter3000/.env
 
 # Start command
