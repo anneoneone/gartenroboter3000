@@ -71,8 +71,12 @@ class RealGpio(GpioInterface):
     def _init_hardware(self) -> None:
         """Initialize hardware interfaces."""
         try:
+            import RPi.GPIO as GPIO
             import spidev
-            from gpiozero import DigitalInputDevice, DigitalOutputDevice
+            from gpiozero import DigitalOutputDevice
+
+            # Set GPIO mode
+            GPIO.setmode(GPIO.BCM)
 
             # Initialize SPI for MCP3008
             self._spi = spidev.SpiDev()
@@ -87,13 +91,15 @@ class RealGpio(GpioInterface):
             )
             self._relay_states[self.settings.pump_relay_pin] = False
 
-            # Initialize ultrasonic sensor
+            # Initialize ultrasonic sensor (trigger only; echo uses polling)
             self._trigger = DigitalOutputDevice(
                 self.settings.ultrasonic_trigger_pin,
                 active_high=True,
                 initial_value=False,
             )
-            self._echo = DigitalInputDevice(self.settings.ultrasonic_echo_pin)
+            # Set echo pin as input using RPi.GPIO (no edge detection)
+            GPIO.setup(self.settings.ultrasonic_echo_pin, GPIO.IN)
+            self._echo = None
 
             logger.info("Hardware GPIO initialized successfully")
         except ImportError as e:
@@ -124,32 +130,39 @@ class RealGpio(GpioInterface):
 
     async def read_ultrasonic_distance(self) -> float:
         """Read distance from HC-SR04 ultrasonic sensor in cm."""
-        if self._trigger is None or self._echo is None:
-            raise RuntimeError("Ultrasonic sensor not initialized")
+        if self._trigger is None:
+            raise RuntimeError("Ultrasonic trigger not initialized")
+
+        # Import RPi.GPIO for direct pin access (no edge detection)
+        try:
+            import RPi.GPIO as GPIO
+        except ImportError:
+            logger.error("RPi.GPIO not available for ultrasonic distance reading")
+            return -1.0
 
         # Send trigger pulse
         self._trigger.on()
         await asyncio.sleep(0.00001)  # 10 microseconds
         self._trigger.off()
 
-        # Wait for echo
+        # Wait for echo pin to go high (pulse start)
         pulse_start = time.time()
-        timeout = pulse_start + 0.1  # 100ms timeout
+        timeout_end = pulse_start + 0.1  # 100ms timeout
 
-        # Wait for echo to go high
-        while not self._echo.is_active:
-            if time.time() > timeout:
+        while GPIO.input(self.settings.ultrasonic_echo_pin) == 0:
+            if time.time() > timeout_end:
                 logger.warning("Ultrasonic timeout waiting for echo start")
                 return -1.0
-            pulse_start = time.time()
 
-        # Wait for echo to go low
-        pulse_end = time.time()
-        while self._echo.is_active:
-            if time.time() > timeout:
+        pulse_start = time.time()
+
+        # Wait for echo pin to go low (pulse end)
+        while GPIO.input(self.settings.ultrasonic_echo_pin) == 1:
+            if time.time() > timeout_end:
                 logger.warning("Ultrasonic timeout waiting for echo end")
                 return -1.0
-            pulse_end = time.time()
+
+        pulse_end = time.time()
 
         # Calculate distance (speed of sound = 34300 cm/s)
         pulse_duration = pulse_end - pulse_start
@@ -179,13 +192,8 @@ class RealGpio(GpioInterface):
         """Cleanup GPIO resources."""
         if self._spi is not None:
             self._spi.close()
-        if self._relay is not None:
-            self._relay.off()
-            self._relay.close()
         if self._trigger is not None:
             self._trigger.close()
-        if self._echo is not None:
-            self._echo.close()
 
         logger.info("GPIO resources cleaned up")
 
