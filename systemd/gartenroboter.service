@@ -43,9 +43,8 @@ OOMPolicy=kill
 # ===== Security hardening =====
 NoNewPrivileges=true
 ProtectSystem=strict
-ProtectHome=read-only
-ReadWritePaths=%USERHOME%/gartenroboter3000/data %USERHOME%/gartenroboter3000/logs %USERHOME%/.cache/uv %USERHOME%/.config/uv
-PrivateTmp=false
+ProtectHome=no
+PrivateTmp=no
 
 # GPIO access
 SupplementaryGroups=gpio spi i2c
