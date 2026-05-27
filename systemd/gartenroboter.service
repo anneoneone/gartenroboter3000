@@ -17,7 +17,8 @@ Environment="UV_CACHE_DIR=/tmp/uv-cache"
 EnvironmentFile=-%USERHOME%/gartenroboter3000/.env
 
 # Start command
-ExecStart=%USERHOME%/.local/bin/uv run gartenroboter
+# Use --with pi to include Raspberry Pi optional dependencies (spidev, gpiozero, etc.)
+ExecStart=%USERHOME%/.local/bin/uv run --with pi gartenroboter
 
 # Restart policy
 Restart=on-failure
