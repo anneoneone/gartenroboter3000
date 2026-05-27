@@ -45,6 +45,7 @@ NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=no
 PrivateTmp=no
+ReadWritePaths=%USERHOME%/.cache
 
 # GPIO access
 SupplementaryGroups=gpio spi i2c
