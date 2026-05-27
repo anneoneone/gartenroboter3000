@@ -124,6 +124,16 @@ class SensorSettings(BaseSettings):
     )
     # Calibration values per sensor (min/max raw ADC values)
     calibration: dict[str, dict[str, int]] = Field(
+
+    @field_validator("bmp280_i2c_address", mode="before")
+    @classmethod
+    def parse_i2c_address(cls, v: Any) -> int:
+        """Strip comments from I2C address if present."""
+        if isinstance(v, str):
+            # Remove everything after '#' (comments)
+            v = v.split("#")[0].strip()
+            return int(v, 0)  # int(v, 0) auto-detects hex/decimal
+        return int(v)
         default_factory=lambda: {
             "zone_1": {"min": 300, "max": 700},
             "zone_2": {"min": 300, "max": 700},
