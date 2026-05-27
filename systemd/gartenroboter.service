@@ -6,9 +6,9 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=%USERNAME%
-Group=%USERNAME%
-WorkingDirectory=%USERHOME%/gartenroboter3000
+User=root
+Group=root
+WorkingDirectory=/home/admintobi/gartenroboter3000
 
 # Environment
 Environment="PATH=%USERHOME%/.local/bin:/usr/local/bin:/usr/bin:/bin"
