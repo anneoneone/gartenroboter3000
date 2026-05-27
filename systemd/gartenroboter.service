@@ -45,8 +45,8 @@ OOMPolicy=kill
 # ===== Security hardening =====
 NoNewPrivileges=true
 ProtectSystem=strict
-ProtectHome=read-only
-ReadWritePaths=/home/admintobi/gartenroboter3000/data /home/admintobi/gartenroboter3000/logs /home/admintobi/.cache
+ReadWritePaths=/home/admintobi/gartenroboter3000
+ProtectHome=no
 PrivateTmp=false
 
 # GPIO access
